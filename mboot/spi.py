@@ -9,7 +9,7 @@ from .protocol import FPType, UartProtocolMixin
 class SPI(UartProtocolMixin):
     def __init__(self, freq=500*1000, mode=0):
         self.mode = mode
-        self.freq = freq
+        self.freq = int(freq, 0) if isinstance(freq, str) else freq
         self.controller = None
         self.slave = None
     
