@@ -10,6 +10,7 @@ import collections
 from time import time
 from struct import pack, unpack_from
 from .misc import atos
+from .protocol import UsbProtocolMixin
 
 #os.environ['PYUSB_DEBUG'] = 'debug'
 #os.environ['PYUSB_LOG_FILENAME'] = 'usb.log'
@@ -63,7 +64,7 @@ if os.name == "nt":
         raise Exception("PyWinUSB is required on a Windows Machine")
 
 
-    class RawHID(RawHidBase):
+    class RawHID(RawHidBase, UsbProtocolMixin):
         """
         This class provides basic functions to access
         a USB HID device using pywinusb:
@@ -120,6 +121,7 @@ if os.name == "nt":
             rawdata = self.rcv_data.popleft()
             logging.debug('USB-IN [%d]: %s', len(rawdata), atos(rawdata))
             return self._decode_packet(bytes(rawdata))
+            # return bytes(rawdata)
 
         @staticmethod
         def enumerate(vid, pid):
@@ -168,7 +170,7 @@ else:
     except:
         raise Exception("PyUSB is required on a Linux Machine")
 
-    class RawHID(RawHidBase):
+    class RawHID(RawHidBase, UsbProtocolMixin):
         """
         This class provides basic functions to access
         a USB HID device using pyusb:

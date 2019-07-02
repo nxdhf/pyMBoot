@@ -5,14 +5,18 @@
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
 import sys
+import time
 import logging
 from struct import pack, unpack_from
 
 # relative imports
 from .enums import CommandTag, PropertyTag, StatusCode
 from .misc import atos, size_fmt
+# from .protocol import UartProtocol, UsbProtocol, FPType
+from .exception import McuBootCommandError
 from .uart import UART
 from .usb import RawHID
+from .spi import SPI
 
 
 ########################################################################################################################
@@ -56,64 +60,6 @@ def decode_property_value(property_tag, raw_value):
 def is_command_available(command_tag, property_raw_value):
     return True if (1 << command_tag) & property_raw_value else False
 
-
-########################################################################################################################
-# KBoot Exceptions
-########################################################################################################################
-
-class McuBootGenericError(Exception):
-    """ Base Exception class for KBoot module """
-
-    _fmt = 'KBoot Error'
-
-    def __init__(self, msg=None, **kw):
-        """ Initialize the Exception with given message. """
-        self.msg = msg
-        for key, value in kw.items():
-            setattr(self, key, value)
-
-    def __str__(self):
-        """ Return the Exception message. """
-        if self.msg:
-            return self.msg
-        try:
-            return self._fmt % self.__dict__
-        except (NameError, ValueError, KeyError):
-            e = sys.exc_info()[1]  # current exception
-            return 'Unprintable exception %s: %s' % (repr(e), str(e))
-
-    def get_error_value(self):
-        return getattr(self, 'errval', -1)
-
-
-class McuBootCommandError(McuBootGenericError):
-    _fmt = 'Command operation break -> %(errname)s'
-
-    def __init__(self, msg=None, **kw):
-        super().__init__(msg, **kw)
-
-        if getattr(self, 'errname', None) is None:
-            setattr(self, 'errname', 'ErrorCode = %d' % self.get_error_value())
-
-
-class McuBootDataError(McuBootGenericError):
-    _fmt = 'Data %(mode)s break -> %(errname)s'
-
-    def __init__(self, msg=None, **kw):
-        super().__init__(msg, **kw)
-
-        if getattr(self, 'errname', None) is None:
-            setattr(self, 'errname', 'ErrorCode = %d' % self.get_error_value())
-
-
-class McuBootConnectionError(McuBootGenericError):
-    _fmt = 'KBoot connection error'
-
-
-class McuBootTimeOutError(McuBootGenericError):
-    _fmt = 'KBoot timeout error'
-
-
 ########################################################################################################################
 # KBoot interfaces
 ########################################################################################################################
@@ -121,7 +67,9 @@ class McuBootTimeOutError(McuBootGenericError):
 DEVICES = {
     # NAME   | VID   | PID
     'MKL27': (0x15A2, 0x0073),
-    'LPC55': (0x1FC9, 0x0021)
+    'LPC55': (0x1FC9, 0x0021),
+    'K82F' : (0x15A2, 0x0073),
+    '232h' : (0x403,0x6014)
 }
 
 
@@ -149,20 +97,15 @@ def scan_usb(device_name=None):
 def scan_uart():
     raise NotImplemented("Function is not implemented")
 
+def scan_uart():
+    raise NotImplemented("Function is not implemented")
+
 
 ########################################################################################################################
 # McuBoot Class
 ########################################################################################################################
 
 class McuBoot(object):
-
-    HID_REPORT = {
-        # KBoot USB HID Reports.
-        'CMD_OUT': 0x01,
-        'CMD_IN': 0x03,
-        'DATA_OUT': 0x02,
-        'DATA_IN': 0x04
-    }
 
     INTERFACES = {
         #  KBoot Interface | mask | default speed
@@ -175,178 +118,24 @@ class McuBoot(object):
         'USB-DFU':   [0x00000040, 12000000],
     }
 
-    class _FPType:
-        # KBoot Framing Packet Type.
-        ACK = 0xA1
-        NACK = 0xA2
-        ABORT = 0xA3
-        CMD = 0xA4
-        DATA = 0xA5
-        PING = 0xA6
-        PINGR = 0xA7
-
     def __init__(self):
+        self._itf_ = None
         self._usb_dev = None
         self._uart_dev = None
+        self._spi_dev = None
         self._pg_func = None
         self._pg_start = 0
         self._pg_end = 100
         self._abort = False
+        # self.protocol = None
 
-    @staticmethod
-    def _parse_status(data):
-        return unpack_from('<I', data, 4)[0]
+    # @staticmethod
+    # def _parse_status(data):
+    #     return unpack_from('<I', data, 4)[0]
 
-    @staticmethod
-    def _parse_value(data):
-        return unpack_from('<I', data, 8)[0]
-
-    def _process_cmd(self, data, timeout=1000):
-        """Process Command Data
-        :rtype : object
-        """
-        if self._usb_dev is None and self._uart_dev is None:
-            logging.info('RX-CMD: USB Disconnected')
-            raise McuBootConnectionError('USB Disconnected')
-
-        # log TX raw command data
-        logging.debug('TX-CMD [%02d]: %s', len(data), atos(data))
-
-        if self._usb_dev:
-            # Send USB-HID CMD OUT Report
-            self._usb_dev.write(self.HID_REPORT['CMD_OUT'], data)
-
-            # Read USB-HID CMD IN Report
-            try:
-                rxpkg = self._usb_dev.read(timeout)[1]
-            except:
-                logging.info('RX-CMD: USB Disconnected')
-                raise McuBootTimeOutError('USB Disconnected')
-        else:
-            # Send UART
-            self._uart_dev.write(self._FPType.CMD, data)
-
-            # Read USB-HID CMD IN Report
-            try:
-                rxpkg = self._uart_dev.read()[1]
-            except:
-                logging.info('RX-CMD: UART Disconnected')
-                raise McuBootTimeOutError('UART Disconnected')
-
-        # log RX raw command data
-        logging.debug('RX-CMD [%02d]: %s', len(rxpkg), atos(rxpkg))
-
-        # Parse and validate status flag
-        status = self._parse_status(rxpkg)
-        if status != StatusCode.SUCCESS:
-            if StatusCode.is_valid(status):
-                logging.info('RX-CMD: %s', StatusCode[status])
-                raise McuBootCommandError(errname=StatusCode[status], errval=status)
-            else:
-                logging.info('RX-CMD: Unknown Error %d', status)
-                raise McuBootCommandError(errval=status)
-
-        return rxpkg
-
-    def _read_data(self, length, timeout=1000):
-        n = 0
-        data = bytearray()
-        pg_dt = float(self._pg_end - self._pg_start) / length
-        self._abort = False
-
-        if self._usb_dev is None and self._uart_dev is None:
-            logging.info('RX-DATA: Disconnected')
-            raise McuBootConnectionError('Disconnected')
-
-        while n < length:
-            # Read USB-HID DATA IN Report
-            try:
-                rep_id, pkg = self._usb_dev.read(timeout)
-            except:
-                logging.info('RX-DATA: USB Disconnected')
-                raise McuBootTimeOutError('USB Disconnected')
-
-            if rep_id != self.HID_REPORT['DATA_IN']:
-                status = self._parse_status(pkg)
-                if StatusCode.is_valid(status):
-                    logging.info('RX-DATA: %s' % StatusCode.desc(status))
-                    raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
-                else:
-                    logging.info('RX-DATA: Unknown Error %d' % status)
-                    raise McuBootDataError(mode='read', errval=status)
-
-            data.extend(pkg)
-            n += len(pkg)
-
-            if self._pg_func:
-                self._pg_func(self._pg_start + int(n * pg_dt))
-
-            if self._abort:
-                logging.info('Read Aborted By User')
-                return
-
-        # Read USB-HID CMD IN Report
-        try:
-            rep_id, pkg = self._usb_dev.read(timeout)
-        except:
-            logging.info('RX-DATA: USB Disconnected')
-            raise McuBootTimeOutError('USB Disconnected')
-
-        # Parse and validate status flag
-        status = self._parse_status(pkg)
-        if status != StatusCode.SUCCESS:
-            if StatusCode.is_valid(status):
-                logging.info('RX-DATA: %s' % StatusCode.desc(status))
-                raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
-            else:
-                logging.info('RX-DATA: Unknown Error %d' % status)
-                raise McuBootDataError(mode='read', errval=status)
-
-        logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
-        return data
-
-    def _send_data(self, data):
-        n = len(data)
-        start = 0
-        pg_dt = float(self._pg_end - self._pg_start) / n
-        self._abort = False
-
-        if self._usb_dev is None and self._uart_dev is None:
-            logging.info('TX-DATA: Disconnected')
-            raise McuBootConnectionError('Disconnected')
-
-        while n > 0:
-            length = 0x20
-            if n < length:
-                length = n
-            txbuf = data[start:start + length]
-
-            # send USB-HID command OUT report
-            self._usb_dev.write(self.HID_REPORT['DATA_OUT'], txbuf)
-
-            n -= length
-            start += length
-
-            if self._pg_func:
-                self._pg_func(self._pg_start + int(start * pg_dt))
-
-            if self._abort:
-                logging.info('Write Aborted By User')
-                return
-        try:
-            rep_id, pkg = self._usb_dev.read()
-        except:
-            logging.info('TX-DATA: USB Disconnected')
-            raise McuBootTimeOutError('USB Disconnected')
-
-        # Parse and validate status flag
-        status = self._parse_status(pkg)
-        if status != StatusCode.SUCCESS:
-            logging.info('TX-DATA: %s' % StatusCode[status])
-            raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
-
-        logging.info('TX-DATA: Successfully Send %d Bytes', len(data))
-        return start
+    # @staticmethod
+    # def _parse_value(data):
+    #     return unpack_from('<I', data, 8)[0]
 
     def set_handler(self, progressbar, start_val=0, end_val=100):
         self._pg_func = progressbar
@@ -369,8 +158,9 @@ class McuBoot(object):
         """
         if dev is not None:
             logging.info('Connect: %s', dev.info())
-            self._usb_dev = dev
-            self._usb_dev.open()
+            self._itf_ = dev
+            self._itf_.open()
+            # self.protocol = UsbProtocol(self._itf_)
 
             return True
         else:
@@ -391,6 +181,18 @@ class McuBoot(object):
         else:
             logging.info('UART Disconnected !')
             return False
+    
+    def open_spi(self, info, freq, mode):
+        """ KBoot: Connect by UART
+        """
+        if info is not None:
+            self._itf_ = SPI(freq, mode)
+            self._itf_.open(*info)
+            # self.protocol = UartProtocol(self._itf_)
+            return True
+        else:
+            logging.info('SPI Disconnected !')
+            return False
 
     def close(self):
         """ KBoot: Disconnect device
@@ -409,7 +211,7 @@ class McuBoot(object):
         :return List of {dict}
         """
         mcu_info = {}
-        if self._usb_dev is None and self._uart_dev is None:
+        if self._itf_ is None:
             logging.info('Disconnected !')
             return None
 
@@ -423,60 +225,65 @@ class McuBoot(object):
 
         return mcu_info
 
-    def flash_erase_all(self):
+    def flash_erase_all(self, memory_id = 0):
         """ KBoot: Erase complete flash memory without recovering flash security section
+        CommandTag: 0x01
         """
-        logging.info('TX-CMD: FlashEraseAll')
+        logging.info('TX-CMD: FlashEraseAll [ memoryId=%d ]', memory_id)
         # Prepare FlashEraseAll command
-        cmd = pack('4B', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00)
+        cmd = pack('4BI', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00, memory_id)
         # Process FlashEraseAll command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
 
-    def flash_erase_region(self, start_address, length):
+    def flash_erase_region(self, start_address, length, memory_id = 0):
         """ KBoot: Erase specified range of flash
+        CommandTag: 0x02
         :param start_address: Start address
         :param length: Count of bytes
         """
-        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d  ]', start_address, length)
+        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d | memoryId=%d ]', start_address, length, memory_id)
         # Prepare FlashEraseRegion command
-        cmd = pack('<4B2I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length)
+        cmd = pack('<4B3I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length, memory_id)
         # Process FlashEraseRegion command
-        self._process_cmd(cmd, 5000)
+        self._itf_.process_cmd(cmd, 5000)
 
-    def read_memory(self, start_address, length):
+    def read_memory(self, start_address, length, memory_id = 0):
         """ KBoot: Read data from MCU memory
+        CommandTag: 0x03
         :param start_address: Start address
         :param length: Count of bytes
         :return List of bytes
         """
         if length == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d  ]', start_address, length)
+        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d | memoryId=%d ]', start_address, length, memory_id)
         # Prepare ReadMemory command
-        cmd = pack('<4B2I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x02, start_address, length)
+        cmd = pack('<4B3I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x03, start_address, length, memory_id)
         # Process ReadMemory command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
         # Process Read Data
-        return self._read_data(length)
+        return self._itf_.read_data(length)
 
-    def write_memory(self, start_address, data):
+    def write_memory(self, start_address, data, memory_id = 0):
         """ KBoot: Write data into MCU memory
+        CommandTag: 0x04
         :param start_address: Start address
         :param data: List of bytes
         :return Count of wrote bytes
         """
         if len(data) == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d  ]', start_address, len(data))
+        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d | memoryId=%d ]', start_address, len(data), memory_id)
         # Prepare WriteMemory command
-        cmd = pack('<4B2I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data))
+        cmd = pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data), memory_id)
         # Process WriteMemory command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
         # Process Write Data
-        return self._send_data(data)
+        return self._itf_.write_data(data)
 
     def fill_memory(self, start_address, length, pattern=0xFFFFFFFF):
         """ KBoot: Fill MCU memory with specified pattern
+        CommandTag: 0x05
         :param start_address: Start address (must be word aligned)
         :param length: Count of words (must be word aligned)
         :param pattern: Count of wrote bytes
@@ -485,10 +292,11 @@ class McuBoot(object):
         # Prepare FillMemory command
         cmd = pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
         # Process FillMemory command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
 
     def flash_security_disable(self, backdoor_key):
         """ KBoot: Disable flash security by backdoor key
+        CommandTag: 0x06
         :param backdoor_key:
         """
         logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
@@ -499,40 +307,46 @@ class McuBoot(object):
         cmd += bytes(backdoor_key[3::-1])
         cmd += bytes(backdoor_key[:3:-1])
         # Process FlashSecurityDisable command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
 
-    def get_property(self, prop_tag, ext_mem_identifier=None):
+    def get_property(self, prop_tag, memory_id = 0):
         """ KBoot: Get value of specified property
+        CommandTag: 0x07
         :param prop_tag: The property ID (see Property enumerator)
-        :param ext_mem_identifier:
+        :param memory_id:
         :return {dict} with 'RAW' and 'STRING/LIST' value
         """
-        logging.info('TX-CMD: GetProperty->%s', PropertyTag[prop_tag])
+        logging.info('TX-CMD: GetProperty->%s [ PropertyTag: %d | memoryId = %d ]', 
+            PropertyTag[prop_tag], PropertyTag[PropertyTag[prop_tag]], memory_id)
         # Prepare GetProperty command
-        if ext_mem_identifier is None:
-            cmd = pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
-        else:
-            cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, ext_mem_identifier)
-        # Process GetProperty command
-        rx_packet = self._process_cmd(cmd)
-        # Parse property value
-        raw_value = self._parse_value(rx_packet)
+        # if memory_id is None:
+        #     memory_id = 0
+        #     cmd = pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
+        # else:
+        #     cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memoryId)
+        cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memory_id)
+        logging.info('RX-CMD:')
+        # Process FillMemory command
+        raw_value = self._itf_.process_cmd(cmd)
+
         logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_value))
         return raw_value
 
-    def set_property(self, prop_tag, value):
+    def set_property(self, prop_tag, value, memory_id = 0):
         """ KBoot: Set value of specified property
+        CommandTag: 0x0C
         :param  property_tag: The property ID (see Property enumerator)
         :param  value: The value of selected property
         """
-        logging.info('TX-CMD: SetProperty->%s = %d', PropertyTag[prop_tag], value)
+        logging.info('TX-CMD: SetProperty->%s = %d [ memoryId = %d ]', PropertyTag[prop_tag], value, memory_id)
         # Prepare SetProperty command
-        cmd = pack('<4B2I', CommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value)
+        cmd = pack('<4B3I', CommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value, memory_id)
         # Process SetProperty command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
 
     def receive_sb_file(self, data):
         """ KBoot: Receive SB file
+        CommandTag: 0x08
         :param  data: SB file data
         """
         if len(data) == 0:
@@ -541,12 +355,13 @@ class McuBoot(object):
         # Prepare WriteMemory command
         cmd = pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
         # Process WriteMemory command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
         # Process Write Data
-        return self._send_data(data)
+        return self._itf_.write_data(data)
 
     def execute(self, jump_address, argument, sp_address):
         """ KBoot: Fill MCU memory with specified pattern
+        CommandTag: 0x09
         :param jump_address: Jump address (must be word aligned)
         :param argument: Function arguments address
         :param sp_address: Stack pointer address
@@ -556,10 +371,11 @@ class McuBoot(object):
         # Prepare Execute command
         cmd = pack('<4B3I', CommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
         # Process Execute command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
 
     def call(self, call_address, argument, sp_address):
         """ KBoot: Fill MCU memory with specified pattern
+        CommandTag: 0x0A
         :param call_address: Call address (must be word aligned)
         :param argument: Function arguments address
         :param sp_address: Stack pointer address
@@ -568,30 +384,42 @@ class McuBoot(object):
         # Prepare Call command
         cmd = pack('<4B3I', CommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
         # Process Call command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
 
     def reset(self):
-        """ KBoot: Reset MCU """
+        """ KBoot: Reset MCU
+        CommandTag: 0x0B
+        """
         logging.info('TX-CMD: Reset MCU')
         # Prepare Reset command
         cmd = pack('4B', CommandTag.RESET, 0x00, 0x00, 0x00)
         # Process Reset command
         try:
-            self._process_cmd(cmd)
+            self._itf_.process_cmd(cmd)
         except:
             pass
+        # else:
+        #     if hasattr(self._itf_, 'set_handler'):
+        #         self._itf_.set_handler(None)
+        #         self._itf_.close()
+                
+        #         self._itf_.open()
+        time.sleep(0.005)   # Wait 5 ms for the device to complete reset
+                
 
     def flash_erase_all_unsecure(self):
         """ KBoot: Erase complete flash memory and recover flash security section
+        CommandTag: 0x0D
         """
         logging.info('TX-CMD: FlashEraseAllUnsecure')
         # Prepare FlashEraseAllUnsecure command
         cmd = pack('4B', CommandTag.FLASH_ERASE_ALL_UNSECURE, 0x00, 0x00, 0x00)
         # Process FlashEraseAllUnsecure command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
 
     def flash_read_once(self, index, length):
         """ KBoot: Read from MCU flash program once region (max 8 bytes)
+        CommandTag: 0x0F
         :param index: Start index
         :param length: Count of bytes
         :return List of bytes
@@ -604,12 +432,13 @@ class McuBoot(object):
         # Prepare FlashReadOnce command
         cmd = pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
         # Process FlashReadOnce command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
         # Process Read Data
-        return self._read_data(length)
+        return self._itf_.read_data(length)
 
     def flash_program_once(self, index, data):
         """ KBoot: Write into MCU flash program once region (max 8 bytes)
+        CommandTag: 0x0E
         :param index: Start index
         :param data: List of bytes
         """
@@ -623,11 +452,12 @@ class McuBoot(object):
         cmd = pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
         cmd += bytes(data)
         # Process FlashProgramOnce command
-        self._process_cmd(cmd)
+        self._itf_.process_cmd(cmd)
         return length
 
     def flash_read_resource(self, start_address, length, option=1):
         """ KBoot: Read resource of flash module
+        CommandTag: 0x10
         :param start_address:
         :param length:
         :param option:
@@ -637,29 +467,44 @@ class McuBoot(object):
         # Prepare FlashReadResource command
         cmd = pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
         # Process FlashReadResource command
-        pkg = self._process_cmd(cmd)
-        rx_len = self._parse_value(pkg)
+        raw_value = self._itf_.process_cmd(cmd)
+        rx_len = raw_value
         length = min(length, rx_len)
         # Process Read Data
-        return self._read_data(length)
+        return self._itf_.read_data(length)
 
     def configure_memory(self):
+        '''
+        CommandTag: 0x11
+        '''
         # TODO: Write implementation
         raise NotImplementedError('Function \"configure_memory()\" not implemented yet')
 
     def reliable_update(self):
+        '''
+        CommandTag: 0x12
+        '''
         # TODO: Write implementation
         raise NotImplementedError('Function \"reliable_update()\" not implemented yet')
 
     def generate_key_blob(self):
+        '''
+        CommandTag: 0x13
+        '''
         # TODO: Write implementation
         raise NotImplementedError('Function \"generate_key_blob()\" not implemented yet')
 
     def key_provisioning(self):
+        '''
+        CommandTag: 0x14 ?? 0x15
+        '''
         # TODO: Write implementation
         raise NotImplementedError('Function \"key_provisioning()\" not implemented yet')
 
     def load_image(self):
+        '''
+        CommandTag: 0x15 ??
+        '''
         # TODO: Write implementation
         raise NotImplementedError('Function \"load_image()\" not implemented yet')
 

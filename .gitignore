@@ -11,3 +11,11 @@ temp
 
 # files
 *.pyc
+
+# vscode
+/.vscode
+/*.code-workspace
+
+# pipenv
+/Pipfile
+/Pipfile.lock

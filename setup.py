@@ -43,7 +43,8 @@ setup(
         'bincopy==16.0.0',
         'easy_enum>=0.1.1',
         'pyusb>=1.0.0b2;platform_system!="Windows"',
-        'pywinusb>=0.4.2;platform_system=="Windows"'
+        'pywinusb>=0.4.2;platform_system=="Windows"',
+        'pyftdi'
     ],
     classifiers=[
         'Programming Language :: Python :: 3',
