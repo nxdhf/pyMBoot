@@ -1,8 +1,7 @@
 import array
 from enum import Enum
+import struct
 import logging
-
-from struct import pack, unpack, unpack_from
 
 from .misc import atos
 from .tool import crc16
@@ -21,14 +20,18 @@ class ProtocolMixin(object):
 
     @staticmethod
     def parse_payload(payload):
-        # commandTag, flags, reserved, parameterCount, propertyTag, propertyValue = unpack('<4B2L', payload)
-        propertyTag, propertyValue = unpack_from('<2L', payload, 4)
+        # commandTag, flags, reserved, parameterCount, propertyTag, propertyValue = struct.unpack('<4B2L', payload)
+        propertyTag, propertyValue = struct.unpack_from('<2L', payload, 4)
         return propertyValue
 
     @staticmethod
     def parse_response_payload(payload):
-        # response_tag, flags, reserved, parameterCount, status, propertyValue = unpack('<4B2L', payload)
-        status, propertyValue = unpack_from('<2L', payload, 4)
+        # response_tag, flags, reserved, parameterCount, status, propertyValue = struct.unpack('<4B2L', payload)
+        try:
+            status, propertyValue = struct.unpack_from('<2L', payload, 4)
+        except struct.error as e:
+            status = struct.unpack_from('<L', payload, 4)
+            propertyValue = None
         return status, propertyValue
 
 class UartProtocolMixin(ProtocolMixin):
@@ -45,7 +48,7 @@ class UartProtocolMixin(ProtocolMixin):
         :parm bytes payload: payload in the current packet
         :returns: The complete packet contains head and payload
         '''
-        head = pack('<2BH', cls._start, packet_type, len(payload))
+        head = struct.pack('<2BH', cls._start, packet_type, len(payload))
         head += (cls._gen_crc(head, payload))
         return head + payload
 
@@ -140,7 +143,7 @@ class UartProtocol(ProtocolMixin):
         :parm bytes payload: payload in the current packet
         :returns: The complete packet contains head and payload
         '''
-        head = pack('<2BH', cls._start, packet_type, len(payload))
+        head = struct.pack('<2BH', cls._start, packet_type, len(payload))
         head += (cls._gen_crc(head, payload))
         return head + payload
     def process_cmd(self, payload, **kwargs):
