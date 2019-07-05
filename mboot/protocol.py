@@ -52,8 +52,33 @@ class UartProtocolMixin(ProtocolMixin):
         head += (cls._gen_crc(head, payload))
         return head + payload
 
-    def process_cmd(self, payload, **kwargs):
-        '''Handling the cmd packet to be sent
+    def read_cmd(self, **kwargs):
+        '''Receive the command packet (only need to receive the packet when an error occurs)
+        Implemented but not called, The process is implemented in read_data, write_data
+        '''
+        try:
+            head, rxpkg = self.read(FPType.CMD, **kwargs)
+        except:
+            logging.info('RX-CMD: %s Disconnected', self.__class__.__name__)
+            raise McuBootTimeOutError('%s Disconnected', self.__class__.__name__)
+        
+        # log RX raw command data
+        logging.debug('RX-CMD [%02d]: %s', len(rxpkg), atos(rxpkg))
+
+        # Parse and validate status flag
+        status, value = self.parse_response_payload(rxpkg)
+        logging.debug('status: %d, value: %d', status, value)
+        if status != StatusCode.SUCCESS:
+            if StatusCode.is_valid(status):
+                logging.error('RX-CMD: %s', StatusCode[status])
+                raise McuBootCommandError(errname=StatusCode[status], errval=status)
+            else:
+                logging.error('RX-CMD: Unknown Error %d', status)
+                raise McuBootCommandError(errval=status)
+        return value
+
+    def write_cmd(self, payload, timeout=1000, **kwargs):
+        '''Send the cmd packet
         :param bytes payload: payload in the current packet
 
         '''
@@ -67,7 +92,7 @@ class UartProtocolMixin(ProtocolMixin):
         try:
             head, rxpkg = self.read(FPType.CMD, **kwargs)
         except:
-            logging.info('RX-CMD: %s Disconnected', self.__class__.__name__)
+            logging.error('RX-CMD: %s Disconnected', self.__class__.__name__)
             raise McuBootTimeOutError('%s Disconnected', self.__class__.__name__)
 
         # log RX raw command data
@@ -78,10 +103,10 @@ class UartProtocolMixin(ProtocolMixin):
         logging.debug('status: %d, value: %d', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
-                logging.info('RX-CMD: %s', StatusCode[status])
+                logging.error('RX-CMD: %s', StatusCode[status])
                 raise McuBootCommandError(errname=StatusCode[status], errval=status)
             else:
-                logging.info('RX-CMD: Unknown Error %d', status)
+                logging.error('RX-CMD: Unknown Error %d', status)
                 raise McuBootCommandError(errval=status)
         return value
 
@@ -100,10 +125,10 @@ class UartProtocolMixin(ProtocolMixin):
         logging.debug('status: %d, value: %d', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
-                logging.info('RX-DATA: %s' % StatusCode.desc(status))
+                logging.error('RX-DATA: %s' % StatusCode.desc(status))
                 raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
             else:
-                logging.info('RX-DATA: Unknown Error %d' % status)
+                logging.error('RX-DATA: Unknown Error %d' % status)
                 raise McuBootDataError(mode='read', errval=status)
 
         logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
@@ -116,7 +141,13 @@ class UartProtocolMixin(ProtocolMixin):
         while n > 0:
             end = start + max_packet_size
             data_packet = self.genPacket(FPType.DATA, data[start:end])
-            self.write(FPType.DATA, data_packet)
+            try:
+                '''There may be a problem with the write, the slave aborts receiving the data, 
+                and the master aborts the write and receives the error message.'''
+                self.write(FPType.DATA, data_packet)
+            except McuBootDataError as e:
+                logging.error(e)
+                break
             start = end
             n -= max_packet_size
         head, pkg = self.read(FPType.CMD)
@@ -124,105 +155,105 @@ class UartProtocolMixin(ProtocolMixin):
         status, value = self.parse_response_payload(pkg)
         logging.debug('status: %d, value: %d', status, value)
         if status != StatusCode.SUCCESS:
-            logging.info('TX-DATA: %s' % StatusCode[status])
+            logging.error('TX-DATA: %s' % StatusCode[status])
             raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
 
         logging.info('TX-DATA: Successfully Send %d Bytes', len(data))
         return start
 
-class UartProtocol(ProtocolMixin):
-    @staticmethod
-    def _gen_crc(head, payload):
-        crc = crc16(head + payload)
-        return array.array('B', [crc & 0xff, crc >> 8 & 0xff])
+# class UartProtocol(ProtocolMixin):
+#     @staticmethod
+#     def _gen_crc(head, payload):
+#         crc = crc16(head + payload)
+#         return array.array('B', [crc & 0xff, crc >> 8 & 0xff])
 
-    @classmethod
-    def genPacket(cls, packet_type, payload):
-        '''
-        :param int packet_type: Currrent packet type
-        :parm bytes payload: payload in the current packet
-        :returns: The complete packet contains head and payload
-        '''
-        head = struct.pack('<2BH', cls._start, packet_type, len(payload))
-        head += (cls._gen_crc(head, payload))
-        return head + payload
-    def process_cmd(self, payload, **kwargs):
-        '''Handling the cmd packet to be sent
-        :param bytes payload: payload in the current packet
+#     @classmethod
+#     def genPacket(cls, packet_type, payload):
+#         '''
+#         :param int packet_type: Currrent packet type
+#         :parm bytes payload: payload in the current packet
+#         :returns: The complete packet contains head and payload
+#         '''
+#         head = struct.pack('<2BH', cls._start, packet_type, len(payload))
+#         head += (cls._gen_crc(head, payload))
+#         return head + payload
+#     def write_cmd(self, payload, **kwargs):
+#         '''Handling the cmd packet to be sent
+#         :param bytes payload: payload in the current packet
 
-        '''
-        self._api.ping()
-        data = self.genPacket(FPType.CMD, payload)
+#         '''
+#         self._api.ping()
+#         data = self.genPacket(FPType.CMD, payload)
 
-        # log TX raw command data
-        logging.debug('TX-CMD [%02d]: %s', len(data), atos(data))
+#         # log TX raw command data
+#         logging.debug('TX-CMD [%02d]: %s', len(data), atos(data))
 
-        self._api.write(FPType.CMD, data)
-        try:
-            head, rxpkg = self._api.read(FPType.CMD, **kwargs)
-        except:
-            logging.info('RX-CMD: %s Disconnected', self._api.__class__.__name__)
-            raise McuBootTimeOutError('%s Disconnected', self._api.__class__.__name__)
+#         self._api.write(FPType.CMD, data)
+#         try:
+#             head, rxpkg = self._api.read(FPType.CMD, **kwargs)
+#         except:
+#             logging.info('RX-CMD: %s Disconnected', self._api.__class__.__name__)
+#             raise McuBootTimeOutError('%s Disconnected', self._api.__class__.__name__)
 
-        # log RX raw command data
-        logging.debug('RX-CMD [%02d]: %s', len(rxpkg), atos(rxpkg))
+#         # log RX raw command data
+#         logging.debug('RX-CMD [%02d]: %s', len(rxpkg), atos(rxpkg))
 
-        # Parse and validate status flag
-        status, value = self.parse_response_payload(rxpkg)
-        logging.debug('status: %d, value: %d', status, value)
-        if status != StatusCode.SUCCESS:
-            if StatusCode.is_valid(status):
-                logging.info('RX-CMD: %s', StatusCode[status])
-                raise McuBootCommandError(errname=StatusCode[status], errval=status)
-            else:
-                logging.info('RX-CMD: Unknown Error %d', status)
-                raise McuBootCommandError(errval=status)
-        return value
+#         # Parse and validate status flag
+#         status, value = self.parse_response_payload(rxpkg)
+#         logging.debug('status: %d, value: %d', status, value)
+#         if status != StatusCode.SUCCESS:
+#             if StatusCode.is_valid(status):
+#                 logging.info('RX-CMD: %s', StatusCode[status])
+#                 raise McuBootCommandError(errname=StatusCode[status], errval=status)
+#             else:
+#                 logging.info('RX-CMD: Unknown Error %d', status)
+#                 raise McuBootCommandError(errval=status)
+#         return value
 
-    def read_data(self, length, timeout=1000):
-        n = 0
-        data = bytearray()
+#     def read_data(self, length, timeout=1000):
+#         n = 0
+#         data = bytearray()
 
-        while n < length:
-            _, pkg = self._api.read(FPType.DATA, 0x20+0x6+6)
-            data.extend(pkg)
-            n += 0x20
-        head, pkg = self._api.read(FPType.CMD)
+#         while n < length:
+#             _, pkg = self._api.read(FPType.DATA, 0x20+0x6+6)
+#             data.extend(pkg)
+#             n += 0x20
+#         head, pkg = self._api.read(FPType.CMD)
 
-        # Parse and validate status flag
-        status, value = self.parse_response_payload(pkg)
-        logging.debug('status: %d, value: %d', status, value)
-        if status != StatusCode.SUCCESS:
-            if StatusCode.is_valid(status):
-                logging.info('RX-DATA: %s' % StatusCode.desc(status))
-                raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
-            else:
-                logging.info('RX-DATA: Unknown Error %d' % status)
-                raise McuBootDataError(mode='read', errval=status)
+#         # Parse and validate status flag
+#         status, value = self.parse_response_payload(pkg)
+#         logging.debug('status: %d, value: %d', status, value)
+#         if status != StatusCode.SUCCESS:
+#             if StatusCode.is_valid(status):
+#                 logging.info('RX-DATA: %s' % StatusCode.desc(status))
+#                 raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
+#             else:
+#                 logging.info('RX-DATA: Unknown Error %d' % status)
+#                 raise McuBootDataError(mode='read', errval=status)
 
-        logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
-        return data
+#         logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
+#         return data
     
-    def write_data(self, data, max_packet_size=0x20):
-        n = len(data)
-        start = 0
+#     def write_data(self, data, max_packet_size=0x20):
+#         n = len(data)
+#         start = 0
         
-        while n > 0:
-            end = start + max_packet_size
-            data_packet = self.genPacket(FPType.DATA, data[start:end])
-            self._api.write(FPType.DATA, data_packet)
-            start = end
-            n -= max_packet_size
-        head, pkg = self._api.read(FPType.CMD)
+#         while n > 0:
+#             end = start + max_packet_size
+#             data_packet = self.genPacket(FPType.DATA, data[start:end])
+#             self._api.write(FPType.DATA, data_packet)
+#             start = end
+#             n -= max_packet_size
+#         head, pkg = self._api.read(FPType.CMD)
 
-        status, value = self.parse_response_payload(pkg)
-        logging.debug('status: %d, value: %d', status, value)
-        if status != StatusCode.SUCCESS:
-            logging.info('TX-DATA: %s' % StatusCode[status])
-            raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
+#         status, value = self.parse_response_payload(pkg)
+#         logging.debug('status: %d, value: %d', status, value)
+#         if status != StatusCode.SUCCESS:
+#             logging.info('TX-DATA: %s' % StatusCode[status])
+#             raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
 
-        logging.info('TX-DATA: Successfully Send %d Bytes', len(data))
-        return start
+#         logging.info('TX-DATA: Successfully Send %d Bytes', len(data))
+#         return start
 
 class UsbProtocolMixin(ProtocolMixin):
     # def __init__(self):
@@ -236,7 +267,7 @@ class UsbProtocolMixin(ProtocolMixin):
     _pg_end = 100
     _abort = False
 
-    def process_cmd(self, payload, timeout=1000, **kwargs):
+    def write_cmd(self, payload, timeout=1000, **kwargs):
         if self.device is None:
             logging.info('RX-DATA: Disconnected')
             raise McuBootConnectionError('Disconnected')
@@ -278,19 +309,19 @@ class UsbProtocolMixin(ProtocolMixin):
         while n < length:
             # Read USB-HID DATA IN Report
             try:
-                rep_id, rx_payload = self.read(timeout)
+                rep_id, rx_payload = self.read(timeout) # note: The length of rx_payload is not necessarily 32 bits
             except:
                 logging.info('RX-DATA: USB Disconnected')
                 raise McuBootTimeOutError('USB Disconnected')
 
-            status, value = self.parse_response_payload(rx_payload)
-            if rep_id != HID_REPORT['DATA_IN']:
-                if StatusCode.is_valid(status):
-                    logging.info('RX-DATA: %s' % StatusCode.desc(status))
-                    raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
-                else:
-                    logging.info('RX-DATA: Unknown Error %d' % status)
-                    raise McuBootDataError(mode='read', errval=status)
+            # if rep_id != HID_REPORT['DATA_IN']:
+            #     status, value = self.parse_response_payload(rx_payload)
+            #     if StatusCode.is_valid(status):
+            #         logging.info('RX-DATA: %s' % StatusCode.desc(status))
+            #         raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
+            #     else:
+            #         logging.info('RX-DATA: Unknown Error %d' % status)
+            #         raise McuBootDataError(mode='read', errval=status)
 
             data.extend(rx_payload)
             n += len(rx_payload)
@@ -381,7 +412,7 @@ class UsbProtocolMixin(ProtocolMixin):
 #         self._abort = False
 #         super().__init__(interface)
 
-#     def process_cmd(self, payload, timeout=1000, **kwargs):
+#     def write_cmd(self, payload, timeout=1000, **kwargs):
 #         # Send USB-HID CMD OUT Report
 #         self._api.write(HID_REPORT['CMD_OUT'], payload)
 

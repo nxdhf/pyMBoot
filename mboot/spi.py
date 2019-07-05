@@ -4,6 +4,8 @@ from pyftdi.spi import SpiController
 from struct import pack, unpack_from
 from .misc import atos
 from .protocol import FPType, UartProtocolMixin
+from .exception import McuBootDataError, McuBootCommandError
+from .enums import StatusCode
 
 # 5A-A6-5A-A4-0C-00-4B-33-07-00-00-02-01-00-00-00-00-00-00-00
 class SPI(UartProtocolMixin):
@@ -30,7 +32,7 @@ class SPI(UartProtocolMixin):
     
     def read(self, packet_type, length=30, rx_ack=False, tx_ack=True):
         data = self.slave.read(length).tobytes()
-        logging.debug('SPI-IN-%s-ORIGIN[%d]: %s', packet_type.name, len(data), atos(data))
+        # logging.debug('SPI-IN-%s-ORIGIN[%d]: %s', packet_type.name, len(data), atos(data))
 
         start_index = data.find(0x5A)
         if rx_ack:
@@ -46,7 +48,7 @@ class SPI(UartProtocolMixin):
         end_index = start_index + 6 + payload_len
         if end_index > length:
             data2 = self.slave.read(end_index - length).tobytes()
-            logging.debug('SPI-IN-%s-ORIGIN[%d]: %s', packet_type.name, len(data2), atos(data2))
+            # logging.debug('SPI-IN-%s-ORIGIN[%d]: %s', packet_type.name, len(data2), atos(data2))
             payload = data[start_index+6:] + data2
         else:
             payload = data[start_index+6:end_index]
@@ -100,9 +102,14 @@ class SPI(UartProtocolMixin):
             start = self.slave.read(1)
             if start[0] == 0x5A:
                 break
-        if not self.slave.read(1)[0] == FPType.ACK:
-            raise EnvironmentError
-        logging.debug('SPI-IN-ACK[2]: 5A A1')
+        packet_type = self.slave.read(1)[0]
+        if not packet_type == FPType.ACK:
+            if packet_type == FPType.ABORT:
+                raise McuBootDataError(mode='write', errname=StatusCode[0x2712])
+            else:
+                raise EnvironmentError()
+        else:
+            logging.debug('SPI-IN-ACK[2]: 5A A1')
 
     def _read_command_packet(self, length=20, rx_ack=True, tx_ack=False):
         data = self.slave.read(length).tobytes()

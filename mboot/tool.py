@@ -1,3 +1,5 @@
+import bincopy
+
 def crc16(data, crc=0, poly=0x1021):
     '''Default calculate CRC-16/XMODEM
     width:      16
@@ -95,7 +97,25 @@ def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
     msg.append((' ' + '-' * (13 + 4 * length)))
     return '\n'.join(msg)
 
-
+def read_file(filename, address):
+    in_data = bincopy.BinFile()
+    try:
+        if filename.lower().endswith(('.srec', '.s19')):
+            in_data.add_srec_file(filename)
+            if address is None:
+                address = in_data.minimum_address
+        elif filename.lower().endswith(('.hex', '.ihex')):
+            in_data.add_ihex_file(filename)
+            if address is None:
+                address = in_data.minimum_address
+        else:
+            in_data.add_binary_file(filename)
+            if address is None:
+                address = 0
+        data = in_data.as_binary()
+    except Exception as e:
+        raise Exception('Could not read from file: {} \n [{}]'.format(filename, str(e)))
+    return data, address
 
 if __name__ == '__main__':
     data = bytes.fromhex('5A A4 0C 00 07 00 00 02 01 00 00 00 00 00 00 00')
