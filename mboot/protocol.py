@@ -115,7 +115,7 @@ class UartProtocolMixin(ProtocolMixin):
         data = bytearray()
 
         while n < length:
-            _, pkg = self.read(FPType.DATA, 0x20+0x6+6)
+            _, pkg = self.read(FPType.DATA)
             data.extend(pkg)
             n += 0x20
         head, pkg = self.read(FPType.CMD)
