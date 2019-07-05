@@ -18,6 +18,31 @@ def crc16(data, crc=0, poly=0x1021):
             crc = temp
     return crc & 0xFFFF
 
+def check_method_arg_number(func, args_len):
+    """Check whether the method can input x arguments
+    :param func: The method to check
+    :param args_len: The length of arguments to be entered
+    :return Result of judgment
+    :rtype: bool
+    """
+
+    '''Calculate the number of arguments required by a function
+    Note: 'co_argcount' not including * or ** args,
+    Because we do not use the indefinite arguments in our function, we can do this.
+    '''
+    func_args_len = func.__code__.co_argcount
+
+    if hasattr(func, '__self__'):   # instance/class method, subtract the 'self/cls' arg
+        func_args_len -= 1
+
+    # Subtract the number of arguments with default values
+    min_func_args_len = func_args_len - len(func.__defaults__)
+
+    if min_func_args_len <= args_len <= func_args_len:
+        return True
+    else:
+        return False
+
 def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
     """ Return string array in hex-dump format
     :param data:          {List} The data array of {Bytes}
