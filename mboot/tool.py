@@ -43,6 +43,21 @@ def check_method_arg_number(func, args_len):
     else:
         return False
 
+def convert_arg_to_int(cmd_args):
+    """Convert str to int as much as possible
+    :param cmd_args: the sequence of args
+    :return the sequence of args
+    """
+    args = []
+    for arg in cmd_args:
+        if isinstance(arg, str):    # Int will cause TypeError
+            try:
+                arg = int(arg, 0)
+            except ValueError:
+                pass    # Unable to convert
+        args.append(arg)
+    return args
+
 def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
     """ Return string array in hex-dump format
     :param data:          {List} The data array of {Bytes}
