@@ -58,11 +58,15 @@ class SPI(UartProtocolMixin):
             self.find_start_byte()
         head = start_byte.tobytes() + self.slave.read(5).tobytes()
         _, _packet_type, payload_len, crc = unpack('<2B2H', head) # framing packet
+        logging.debug('SPI-IN-%s-HEAD[%d]: %s', packet_type.name, len(head), atos(head))
         if not _packet_type == packet_type:
-            raise EnvironmentError
+            if _packet_type == FPType.CMD:   # Slave interrupt in read data
+                pass    # Read out the rest of the command
+            else:
+                raise EnvironmentError
         payload = self.slave.read(payload_len).tobytes()
 
-        logging.debug('SPI-IN-%s-HEAD[%d]-PAYLOAD[%d]: %s%s', packet_type.name, len(head), len(payload), atos(head), atos(payload))
+        logging.debug('SPI-IN-%s-PAYLOAD[%d]: %s', packet_type.name, len(payload), atos(payload))
 
         if tx_ack:
             self.send_ack()
@@ -134,6 +138,11 @@ class SPI(UartProtocolMixin):
                 raise EnvironmentError()
         else:
             logging.debug('SPI-IN-ACK[2]: 5A A1')
+    
+    @staticmethod
+    def parse_framing(head):
+        _, _packet_type, payload_len, crc = unpack('<2B2H', head)
+        return _packet_type, crc
 
     def _read_command_packet(self, length=20, rx_ack=True, tx_ack=False):
         data = self.slave.read(length).tobytes()

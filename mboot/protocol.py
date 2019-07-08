@@ -27,10 +27,11 @@ class ProtocolMixin(object):
     @staticmethod
     def parse_response_payload(payload):
         # response_tag, flags, reserved, parameterCount, status, propertyValue = struct.unpack('<4B2L', payload)
+        logging.debug('RX-CMD -- %s', payload)
         try:
             status, propertyValue = struct.unpack_from('<2L', payload, 4)
         except struct.error as e:
-            status = struct.unpack_from('<L', payload, 4)
+            status = struct.unpack_from('<L', payload, 4)[0]
             propertyValue = None
         return status, propertyValue
 
@@ -70,10 +71,10 @@ class UartProtocolMixin(ProtocolMixin):
         logging.debug('status: %d, value: %d', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
-                logging.error('RX-CMD: %s', StatusCode[status])
+                logging.debug('TX-CMD: %s', StatusCode[status])
                 raise McuBootCommandError(errname=StatusCode[status], errval=status)
             else:
-                logging.error('RX-CMD: Unknown Error %d', status)
+                logging.debug('TX-CMD: Unknown Error %d', status)
                 raise McuBootCommandError(errval=status)
         return value
 
@@ -103,10 +104,10 @@ class UartProtocolMixin(ProtocolMixin):
         logging.debug('status: %d, value: %d', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
-                logging.error('RX-CMD: %s', StatusCode[status])
+                logging.debug('RX-CMD: %s', StatusCode[status])
                 raise McuBootCommandError(errname=StatusCode[status], errval=status)
             else:
-                logging.error('RX-CMD: Unknown Error %d', status)
+                logging.debug('RX-CMD: Unknown Error %d', status)
                 raise McuBootCommandError(errval=status)
         return value
 
@@ -115,7 +116,21 @@ class UartProtocolMixin(ProtocolMixin):
         data = bytearray()
 
         while n < length:
-            _, pkg = self.read(FPType.DATA)
+            head, pkg = self.read(FPType.DATA)
+            _packet_type, crc = self.parse_framing(head)
+            
+            '''Slave interrupt in read data
+            Parse the package and throw the appropriate error'''
+            if _packet_type == FPType.CMD:
+                status, value = self.parse_response_payload(pkg)
+                logging.debug('status: %d, value: %d', status, value)
+                if status != StatusCode.SUCCESS:
+                    if StatusCode.is_valid(status):
+                        logging.debug('RX-DATA: %s' % StatusCode.desc(status))
+                        raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
+                    else:
+                        logging.debug('RX-DATA: Unknown Error %d' % status)
+                        raise McuBootDataError(mode='read', errval=status)
             data.extend(pkg)
             n += 0x20
         head, pkg = self.read(FPType.CMD)
@@ -125,10 +140,10 @@ class UartProtocolMixin(ProtocolMixin):
         logging.debug('status: %d, value: %d', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
-                logging.error('RX-DATA: %s' % StatusCode.desc(status))
+                logging.debug('RX-DATA: %s' % StatusCode.desc(status))
                 raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
             else:
-                logging.error('RX-DATA: Unknown Error %d' % status)
+                logging.debug('RX-DATA: Unknown Error %d' % status)
                 raise McuBootDataError(mode='read', errval=status)
 
         logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
@@ -155,7 +170,7 @@ class UartProtocolMixin(ProtocolMixin):
         status, value = self.parse_response_payload(pkg)
         logging.debug('status: %d, value: %d', status, value)
         if status != StatusCode.SUCCESS:
-            logging.error('TX-DATA: %s' % StatusCode[status])
+            logging.debug('TX-DATA: %s' % StatusCode[status])
             raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
 
         logging.info('TX-DATA: Successfully Send %d Bytes', len(data))

@@ -12,6 +12,7 @@ from struct import pack, unpack_from
 # relative imports
 from .enums import CommandTag, PropertyTag, StatusCode
 from .misc import atos, size_fmt
+from .tool import read_file
 # from .protocol import UartProtocol, UsbProtocol, FPType
 from .exception import McuBootCommandError
 from .uart import UART
@@ -120,6 +121,7 @@ class McuBoot(object):
 
     def __init__(self):
         self._itf_ = None
+        self.timeout = None or 5000
         self._usb_dev = None
         self._uart_dev = None
         self._spi_dev = None
@@ -233,7 +235,7 @@ class McuBoot(object):
         # Prepare FlashEraseAll command
         cmd = pack('4BI', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00, memory_id)
         # Process FlashEraseAll command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
 
     def flash_erase_region(self, start_address, length, memory_id = 0):
         """ KBoot: Erase specified range of flash
@@ -241,11 +243,11 @@ class McuBoot(object):
         :param start_address: Start address
         :param length: Count of bytes
         """
-        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d | memoryId=%d ]', start_address, length, memory_id)
+        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=%#08X | len=%#x | memoryId=%d ]', start_address, length, memory_id)
         # Prepare FlashEraseRegion command
         cmd = pack('<4B3I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length, memory_id)
         # Process FlashEraseRegion command
-        self._itf_.process_cmd(cmd, 5000)
+        self._itf_.write_cmd(cmd, self.timeout)
 
     def read_memory(self, start_address, length, memory_id = 0):
         """ KBoot: Read data from MCU memory
@@ -256,28 +258,32 @@ class McuBoot(object):
         """
         if length == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d | memoryId=%d ]', start_address, length, memory_id)
+        logging.info('TX-CMD: ReadMemory [ StartAddr=%#08X | len=%#x | memoryId=%d ]', start_address, length, memory_id)
         # Prepare ReadMemory command
         cmd = pack('<4B3I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x03, start_address, length, memory_id)
         # Process ReadMemory command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
         # Process Read Data
         return self._itf_.read_data(length)
 
-    def write_memory(self, start_address, data, memory_id = 0):
+    def write_memory(self, start_address, filename, memory_id = 0):
         """ KBoot: Write data into MCU memory
         CommandTag: 0x04
         :param start_address: Start address
         :param data: List of bytes
         :return Count of wrote bytes
         """
+        if isinstance(filename, bytes):
+            data = filename
+        else:
+            data, address = read_file(filename, start_address)
         if len(data) == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d | memoryId=%d ]', start_address, len(data), memory_id)
+        logging.info('TX-CMD: WriteMemory [ StartAddr=%#08X | len=%#x | memoryId=%d ]', address, len(data), memory_id)
         # Prepare WriteMemory command
-        cmd = pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data), memory_id)
+        cmd = pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, address, len(data), memory_id)
         # Process WriteMemory command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
         # Process Write Data
         return self._itf_.write_data(data)
 
@@ -288,11 +294,11 @@ class McuBoot(object):
         :param length: Count of words (must be word aligned)
         :param pattern: Count of wrote bytes
         """
-        logging.info('TX-CMD: FillMemory [ address=0x%08X | len=%d  | patern=0x%08X ]', start_address, length, pattern)
+        logging.info('TX-CMD: FillMemory [ address=%#08X | len=%#x  | patern=0x%08X ]', start_address, length, pattern)
         # Prepare FillMemory command
         cmd = pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
         # Process FillMemory command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
 
     def flash_security_disable(self, backdoor_key):
         """ KBoot: Disable flash security by backdoor key
@@ -307,7 +313,7 @@ class McuBoot(object):
         cmd += bytes(backdoor_key[3::-1])
         cmd += bytes(backdoor_key[:3:-1])
         # Process FlashSecurityDisable command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
 
     def get_property(self, prop_tag, memory_id = 0):
         """ KBoot: Get value of specified property
@@ -325,9 +331,8 @@ class McuBoot(object):
         # else:
         #     cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memoryId)
         cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memory_id)
-        logging.info('RX-CMD:')
         # Process FillMemory command
-        raw_value = self._itf_.process_cmd(cmd)
+        raw_value = self._itf_.write_cmd(cmd)
 
         logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_value))
         return raw_value
@@ -342,7 +347,7 @@ class McuBoot(object):
         # Prepare SetProperty command
         cmd = pack('<4B3I', CommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value, memory_id)
         # Process SetProperty command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
 
     def receive_sb_file(self, data):
         """ KBoot: Receive SB file
@@ -355,7 +360,7 @@ class McuBoot(object):
         # Prepare WriteMemory command
         cmd = pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
         # Process WriteMemory command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
         # Process Write Data
         return self._itf_.write_data(data)
 
@@ -371,7 +376,7 @@ class McuBoot(object):
         # Prepare Execute command
         cmd = pack('<4B3I', CommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
         # Process Execute command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
 
     def call(self, call_address, argument, sp_address):
         """ KBoot: Fill MCU memory with specified pattern
@@ -384,7 +389,7 @@ class McuBoot(object):
         # Prepare Call command
         cmd = pack('<4B3I', CommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
         # Process Call command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
 
     def reset(self):
         """ KBoot: Reset MCU
@@ -395,7 +400,7 @@ class McuBoot(object):
         cmd = pack('4B', CommandTag.RESET, 0x00, 0x00, 0x00)
         # Process Reset command
         try:
-            self._itf_.process_cmd(cmd)
+            self._itf_.write_cmd(cmd)
         except:
             pass
         # else:
@@ -415,7 +420,7 @@ class McuBoot(object):
         # Prepare FlashEraseAllUnsecure command
         cmd = pack('4B', CommandTag.FLASH_ERASE_ALL_UNSECURE, 0x00, 0x00, 0x00)
         # Process FlashEraseAllUnsecure command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
 
     def flash_read_once(self, index, length):
         """ KBoot: Read from MCU flash program once region (max 8 bytes)
@@ -432,7 +437,7 @@ class McuBoot(object):
         # Prepare FlashReadOnce command
         cmd = pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
         # Process FlashReadOnce command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
         # Process Read Data
         return self._itf_.read_data(length)
 
@@ -452,7 +457,7 @@ class McuBoot(object):
         cmd = pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
         cmd += bytes(data)
         # Process FlashProgramOnce command
-        self._itf_.process_cmd(cmd)
+        self._itf_.write_cmd(cmd)
         return length
 
     def flash_read_resource(self, start_address, length, option=1):
@@ -467,7 +472,7 @@ class McuBoot(object):
         # Prepare FlashReadResource command
         cmd = pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
         # Process FlashReadResource command
-        raw_value = self._itf_.process_cmd(cmd)
+        raw_value = self._itf_.write_cmd(cmd)
         rx_len = raw_value
         length = min(length, rx_len)
         # Process Read Data
