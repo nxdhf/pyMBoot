@@ -34,7 +34,7 @@ class McuBootCommandError(McuBootGenericError):
         super().__init__(msg, **kw)
 
         if getattr(self, 'errname', None) is None:
-            setattr(self, 'errname', 'ErrorCode = %d' % self.get_error_value())
+            setattr(self, 'errname', 'ErrorCode = {0:d}({0:#x})'.format(self.get_error_value()))
 
 
 class McuBootDataError(McuBootGenericError):
@@ -44,7 +44,7 @@ class McuBootDataError(McuBootGenericError):
         super().__init__(msg, **kw)
 
         if getattr(self, 'errname', None) is None:
-            setattr(self, 'errname', 'ErrorCode = %d' % self.get_error_value())
+            setattr(self, 'errname', 'ErrorCode = {0:d}({0:#x})'.format(self.get_error_value()))
 
 
 class McuBootConnectionError(McuBootGenericError):

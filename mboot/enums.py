@@ -156,6 +156,7 @@ class StatusCode(Enum):
     MEMORY_RANGE_INVALID = (10200, 'MemoryRangeInvalid', 'Memory Range Invalid')
     MEMORY_READ_FAILED = (10201, 'MemoryReadFailed', 'Memory Read Failed')
     MEMORY_WRITE_FAILED = (10202, 'MemoryWriteFailed', 'Memory Write Failed')
+    MEMORY_UNSUPPORTED_COMMAND = (10213, 'MemoryUnsupportedCommand', 'Memory Unsupport Command, Such As Flash Erase')
 
     # Property store errors.
     UNKNOWN_PROPERTY = (10300, 'UnknownProperty', 'Unknown Property')
