@@ -177,8 +177,6 @@ class SPI(UartProtocolMixin):
         return payload
     
     def _read_data_packet(self, length=0x20+0x6+5, tx_ack=True):
-        print('---')
-        
         data = self.slave.read(length).tobytes()
         logging.debug('SPI-IN-ORIGIN[%d]: %s', len(data), atos(data))
 

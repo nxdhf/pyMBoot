@@ -577,8 +577,10 @@ def reset(ctx):
 
 
 def main():
-    cli(obj={})
+    # cli(obj={})
+    mboot.cli.main()
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    cli.main()

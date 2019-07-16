@@ -7,18 +7,18 @@
 import sys
 import time
 import logging
-from struct import pack, unpack_from
+import struct
 
 # relative imports
 from .enums import CommandTag, PropertyTag, StatusCode
 from .misc import atos, size_fmt
-from .tool import read_file
+from .tool import read_file, write_file
 # from .protocol import UartProtocol, UsbProtocol, FPType
-from .exception import McuBootCommandError
+from .exception import McuBootGenericError, McuBootCommandError
 from .uart import UART
 from .usb import RawHID
 from .spi import SPI
-
+from .memorytool import MemoryBlock, Memory, Flash
 
 ########################################################################################################################
 # Helper functions
@@ -65,34 +65,34 @@ def is_command_available(command_tag, property_raw_value):
 # KBoot interfaces
 ########################################################################################################################
 
-DEVICES = {
-    # NAME   | VID   | PID
-    'MKL27': (0x15A2, 0x0073),
-    'LPC55': (0x1FC9, 0x0021),
-    'K82F' : (0x15A2, 0x0073),
-    '232h' : (0x403,0x6014)
-}
+# DEVICES = {
+#     # NAME   | VID   | PID
+#     'MKL27': (0x15A2, 0x0073),
+#     'LPC55': (0x1FC9, 0x0021),
+#     'K82F' : (0x15A2, 0x0073),
+#     '232h' : (0x403,0x6014)
+# }
 
 
-def scan_usb(device_name=None):
-    """ KBoot: Scan commected USB devices
-    :rtype : list
-    """
-    devices = []
+# def scan_usb(device_name=None):
+#     """ KBoot: Scan commected USB devices
+#     :rtype : list
+#     """
+#     devices = []
 
-    if device_name is None:
-        for name, value in DEVICES.items():
-            devices += RawHID.enumerate(value[0], value[1])
-    else:
-        if ':' in device_name:
-            vid, pid = device_name.split(':')
-            devices = RawHID.enumerate(int(vid, 0), int(pid, 0))
-        else:
-            if device_name in DEVICES:
-                vid = DEVICES[device_name][0]
-                pid = DEVICES[device_name][1]
-                devices = RawHID.enumerate(vid, pid)
-    return devices
+#     if device_name is None:
+#         for name, value in DEVICES.items():
+#             devices += RawHID.enumerate(value[0], value[1])
+#     else:
+#         if ':' in device_name:
+#             vid, pid = device_name.split(':')
+#             devices = RawHID.enumerate(int(vid, 0), int(pid, 0))
+#         else:
+#             if device_name in DEVICES:
+#                 vid = DEVICES[device_name][0]
+#                 pid = DEVICES[device_name][1]
+#                 devices = RawHID.enumerate(vid, pid)
+#     return devices
 
 
 def scan_uart():
@@ -129,7 +129,6 @@ class McuBoot(object):
         self._pg_start = 0
         self._pg_end = 100
         self._abort = False
-        # self.protocol = None
 
     # @staticmethod
     # def _parse_status(data):
@@ -207,6 +206,21 @@ class McuBoot(object):
             self._uart_dev = None
         else:
             return
+    
+    def get_memory_range(self):
+        mstart = self.get_property(PropertyTag.RAM_START_ADDRESS)
+        mlength = self.get_property(PropertyTag.RAM_SIZE)
+        self.memory = Memory(mstart, None, mlength)
+        # No on-chip flash situation
+        fstart = self.get_property(PropertyTag.FLASH_START_ADDRESS)
+        flength = self.get_property(PropertyTag.FLASH_SIZE)
+        self.flash = Flash(fstart, None, flength)
+
+    def is_in_memory(self, block):
+        return block in self.memory
+
+    def is_in_flash(self, block):
+        return block in self.flash
 
     def get_mcu_info(self):
         """ KBoot: Get MCU info (available properties collection)
@@ -233,7 +247,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashEraseAll [ memoryId=%d ]', memory_id)
         # Prepare FlashEraseAll command
-        cmd = pack('4BI', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00, memory_id)
+        cmd = struct.pack('4BI', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00, memory_id)
         # Process FlashEraseAll command
         self._itf_.write_cmd(cmd)
 
@@ -243,13 +257,13 @@ class McuBoot(object):
         :param start_address: Start address
         :param length: Count of bytes
         """
-        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=%#08X | len=%#x | memoryId=%d ]', start_address, length, memory_id)
+        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=0x%X | memoryId=%d ]', start_address, length, memory_id)
         # Prepare FlashEraseRegion command
-        cmd = pack('<4B3I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length, memory_id)
+        cmd = struct.pack('<4B3I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length, memory_id)
         # Process FlashEraseRegion command
         self._itf_.write_cmd(cmd, self.timeout)
 
-    def read_memory(self, start_address, length, memory_id = 0):
+    def read_memory(self, start_address, length, filename = None, memory_id = 0):
         """ KBoot: Read data from MCU memory
         CommandTag: 0x03
         :param start_address: Start address
@@ -258,13 +272,17 @@ class McuBoot(object):
         """
         if length == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: ReadMemory [ StartAddr=%#08X | len=%#x | memoryId=%d ]', start_address, length, memory_id)
+        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=0x%X | memoryId=%d ]', start_address, length, memory_id)
         # Prepare ReadMemory command
-        cmd = pack('<4B3I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x03, start_address, length, memory_id)
+        cmd = struct.pack('<4B3I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x03, start_address, length, memory_id)
         # Process ReadMemory command
         self._itf_.write_cmd(cmd)
         # Process Read Data
-        return self._itf_.read_data(length)
+        data = self._itf_.read_data(length)
+        if filename:
+            write_file(filename, data)
+            logging.info("Successfully saved into: {}".format(filename))
+        return data
 
     def write_memory(self, start_address, filename, memory_id = 0):
         """ KBoot: Write data into MCU memory
@@ -273,30 +291,47 @@ class McuBoot(object):
         :param data: List of bytes
         :return Count of wrote bytes
         """
-        if isinstance(filename, bytes):
-            data = filename
-        else:
+        if isinstance(filename, str):   # Enter the file name
             data, address = read_file(filename, start_address)
+        else:   # Enter the file data
+            address = start_address
+            data = filename
         if len(data) == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: WriteMemory [ StartAddr=%#08X | len=%#x | memoryId=%d ]', address, len(data), memory_id)
+        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=0x%x | memoryId=%d ]', address, len(data), memory_id)
         # Prepare WriteMemory command
-        cmd = pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, address, len(data), memory_id)
+        cmd = struct.pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, address, len(data), memory_id)
         # Process WriteMemory command
         self._itf_.write_cmd(cmd)
         # Process Write Data
         return self._itf_.write_data(data)
 
-    def fill_memory(self, start_address, length, pattern=0xFFFFFFFF):
+    def fill_memory(self, start_address, length, pattern=0xFFFFFFFF, unit='word'):
         """ KBoot: Fill MCU memory with specified pattern
         CommandTag: 0x05
         :param start_address: Start address (must be word aligned)
-        :param length: Count of words (must be word aligned)
-        :param pattern: Count of wrote bytes
+        :param length: Total length of padding, count of bytes
+        :param pattern: The pattern used for padding that must match the unit and its length cannot exceed one word
+        :param unit: Process pattern according to word, short(half-word), byte
         """
-        logging.info('TX-CMD: FillMemory [ address=%#08X | len=%#x  | patern=0x%08X ]', start_address, length, pattern)
+        try:
+            if unit == 'word':
+                _pattern = pattern
+            elif unit == 'short':
+                word = struct.pack('<2H', pattern, pattern)
+                _pattern = struct.unpack('<I', word)[0]
+            elif unit == 'byte':
+                word = struct.pack('<4B', pattern, pattern, pattern, pattern)
+                _pattern = struct.unpack('<I', word)[0]
+            else:
+                raise McuBootGenericError('Have no unit {}'.format(unit))
+        except struct.error as e:
+            raise McuBootGenericError('Pattern 0x{:08X} does not match unit {}'.format(pattern, unit))
+
+        logging.info('TX-CMD: FillMemory [ address=0x%08X | len=0x%#X | patern=0x%08X | unit=%s ]', 
+            start_address, length, pattern, unit)
         # Prepare FillMemory command
-        cmd = pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
+        cmd = struct.pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, _pattern)
         # Process FillMemory command
         self._itf_.write_cmd(cmd)
 
@@ -307,7 +342,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
         # Prepare FlashSecurityDisable command
-        cmd = pack('4B', CommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
+        cmd = struct.pack('4B', CommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
         if len(backdoor_key) < 8:
             raise ValueError('Short range of backdoor key')
         cmd += bytes(backdoor_key[3::-1])
@@ -327,10 +362,10 @@ class McuBoot(object):
         # Prepare GetProperty command
         # if memory_id is None:
         #     memory_id = 0
-        #     cmd = pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
+        #     cmd = struct.pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
         # else:
-        #     cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memoryId)
-        cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memory_id)
+        #     cmd = struct.pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memoryId)
+        cmd = struct.pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memory_id)
         # Process FillMemory command
         raw_value = self._itf_.write_cmd(cmd)
 
@@ -345,7 +380,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: SetProperty->%s = %d [ memoryId = %d ]', PropertyTag[prop_tag], value, memory_id)
         # Prepare SetProperty command
-        cmd = pack('<4B3I', CommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value, memory_id)
+        cmd = struct.pack('<4B3I', CommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value, memory_id)
         # Process SetProperty command
         self._itf_.write_cmd(cmd)
 
@@ -358,7 +393,7 @@ class McuBoot(object):
             raise ValueError('Data len is zero')
         logging.info('TX-CMD: Receive SB file [ len=%d ]', len(data))
         # Prepare WriteMemory command
-        cmd = pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
+        cmd = struct.pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
         # Process WriteMemory command
         self._itf_.write_cmd(cmd)
         # Process Write Data
@@ -374,7 +409,7 @@ class McuBoot(object):
         logging.info('TX-CMD: Execute [ JumpAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', jump_address, argument,
                      sp_address)
         # Prepare Execute command
-        cmd = pack('<4B3I', CommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
+        cmd = struct.pack('<4B3I', CommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
         # Process Execute command
         self._itf_.write_cmd(cmd)
 
@@ -387,7 +422,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
         # Prepare Call command
-        cmd = pack('<4B3I', CommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
+        cmd = struct.pack('<4B3I', CommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
         # Process Call command
         self._itf_.write_cmd(cmd)
 
@@ -397,7 +432,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: Reset MCU')
         # Prepare Reset command
-        cmd = pack('4B', CommandTag.RESET, 0x00, 0x00, 0x00)
+        cmd = struct.pack('4B', CommandTag.RESET, 0x00, 0x00, 0x00)
         # Process Reset command
         try:
             self._itf_.write_cmd(cmd)
@@ -418,7 +453,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashEraseAllUnsecure')
         # Prepare FlashEraseAllUnsecure command
-        cmd = pack('4B', CommandTag.FLASH_ERASE_ALL_UNSECURE, 0x00, 0x00, 0x00)
+        cmd = struct.pack('4B', CommandTag.FLASH_ERASE_ALL_UNSECURE, 0x00, 0x00, 0x00)
         # Process FlashEraseAllUnsecure command
         self._itf_.write_cmd(cmd)
 
@@ -433,9 +468,9 @@ class McuBoot(object):
             length = 8 - index
         if length == 0:
             raise ValueError('Index out of range')
-        logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d   ]', index, length)
+        logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d ]', index, length)
         # Prepare FlashReadOnce command
-        cmd = pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
+        cmd = struct.pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
         # Process FlashReadOnce command
         self._itf_.write_cmd(cmd)
         # Process Read Data
@@ -452,9 +487,9 @@ class McuBoot(object):
             length = 8 - index
         if length == 0:
             raise ValueError('Index out of range')
-        logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s  ]', index, atos(data[:length]))
+        logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s ]', index, atos(data[:length]))
         # Prepare FlashProgramOnce command
-        cmd = pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
+        cmd = struct.pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
         cmd += bytes(data)
         # Process FlashProgramOnce command
         self._itf_.write_cmd(cmd)
@@ -470,7 +505,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
         # Prepare FlashReadResource command
-        cmd = pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
+        cmd = struct.pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
         # Process FlashReadResource command
         raw_value = self._itf_.write_cmd(cmd)
         rx_len = raw_value

@@ -1,4 +1,5 @@
 import bincopy
+from .exception import McuBootGenericError
 
 def crc16(data, crc=0, poly=0x1021):
     '''Default calculate CRC-16/XMODEM
@@ -73,7 +74,7 @@ def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
         length = 16
 
     # Create header
-    header = '  ADDRESS | '
+    header = ' ADDRESS | '
     for i in range(0, length):
         header += "{:02X} ".format(i)
     header += '| '
@@ -151,11 +152,30 @@ def read_file(filename, address):
         else:
             in_data.add_binary_file(filename)
             if address is None:
-                address = 0
+                raise McuBootGenericError('Write a bin file to device must provide a write address.')
         data = in_data.as_binary()
     except Exception as e:
-        raise Exception('Could not read from file: {} \n [{}]'.format(filename, str(e)))
+        raise Exception('Could not write to file {}:\n [{}]'.format(filename, str(e)))
     return data, address
+
+def write_file(filename, data):
+    try:
+        if filename.lower().endswith(('.srec', '.s19')):
+            srec = bincopy.BinFile()
+            srec.add_binary(data, address)
+            srec.header = 'mboot'
+            with open(filename, "w") as f:
+                f.write(srec.as_srec())
+        elif filename.lower().endswith(('.hex', '.ihex')):
+            ihex = bincopy.BinFile()
+            ihex.add_binary(data, address)
+            with open(filename, "w") as f:
+                f.write(ihex.as_ihex())
+        else:
+            with open(filename, "wb") as f:
+                f.write(data)
+    except Exception as e:
+        raise Exception('Could not write to file {}:\n [{}]'.format(filename, str(e)))
 
 if __name__ == '__main__':
     data = bytes.fromhex('5A A4 0C 00 07 00 00 02 01 00 00 00 00 00 00 00')

@@ -5,8 +5,10 @@
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
 from .enums import CommandTag, PropertyTag, StatusCode
-from .mboot import McuBoot, scan_usb, decode_property_value, is_command_available
+from .memorytool import MemoryBlock, Memory, Flash
+from .mboot import McuBoot, decode_property_value, is_command_available
 from .exception import McuBootGenericError, McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
+from .cli import main
 
 __author__ = "Martin Olejar"
 __contact__ = "martin.olejar@gmail.com"
@@ -16,9 +18,12 @@ __status__ = 'Development'
 
 __all__ = [
     # global methods
-    'scan_usb',
     'decode_property_value',
     'is_command_available',
+    # memory tool
+    'MemoryBlock',
+    'Memory',
+    'Flash',
     # classes
     'McuBoot',
     # enums

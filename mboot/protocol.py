@@ -27,12 +27,11 @@ class ProtocolMixin(object):
     @staticmethod
     def parse_response_payload(payload):
         # response_tag, flags, reserved, parameterCount, status, propertyValue = struct.unpack('<4B2L', payload)
-        logging.debug('RX-CMD -- %s', payload)
         try:
             status, propertyValue = struct.unpack_from('<2L', payload, 4)
         except struct.error as e:
             status = struct.unpack_from('<L', payload, 4)[0]
-            propertyValue = None
+            propertyValue = 0   # Should be set to None, but it will cause problems when printing cannot be converted
         return status, propertyValue
 
 class UartProtocolMixin(ProtocolMixin):
@@ -68,7 +67,7 @@ class UartProtocolMixin(ProtocolMixin):
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(rxpkg)
-        logging.debug('status: %d, value: %d', status, value)
+        logging.debug('status: %#x, value: %#x', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
                 logging.debug('TX-CMD: %s', StatusCode[status])
@@ -93,7 +92,7 @@ class UartProtocolMixin(ProtocolMixin):
         try:
             head, rxpkg = self.read(FPType.CMD, **kwargs)
         except:
-            logging.error('RX-CMD: %s Disconnected', self.__class__.__name__)
+            logging.debug('RX-CMD: %s Disconnected', self.__class__.__name__)
             raise McuBootTimeOutError('%s Disconnected', self.__class__.__name__)
 
         # log RX raw command data
@@ -101,7 +100,7 @@ class UartProtocolMixin(ProtocolMixin):
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(rxpkg)
-        logging.debug('status: %d, value: %d', status, value)
+        logging.debug('status: %#x, value: %#x', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
                 logging.debug('RX-CMD: %s', StatusCode[status])
@@ -123,7 +122,7 @@ class UartProtocolMixin(ProtocolMixin):
             Parse the package and throw the appropriate error'''
             if _packet_type == FPType.CMD:
                 status, value = self.parse_response_payload(pkg)
-                logging.debug('status: %d, value: %d', status, value)
+                logging.debug('status: %#x, value: %#x', status, value)
                 if status != StatusCode.SUCCESS:
                     if StatusCode.is_valid(status):
                         logging.debug('RX-DATA: %s' % StatusCode.desc(status))
@@ -137,7 +136,7 @@ class UartProtocolMixin(ProtocolMixin):
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(pkg)
-        logging.debug('status: %d, value: %d', status, value)
+        logging.debug('status: %#x, value: %#x', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
                 logging.debug('RX-DATA: %s' % StatusCode.desc(status))
@@ -168,7 +167,7 @@ class UartProtocolMixin(ProtocolMixin):
         head, pkg = self.read(FPType.CMD)
 
         status, value = self.parse_response_payload(pkg)
-        logging.debug('status: %d, value: %d', status, value)
+        logging.debug('status: %#x, value: %#x', status, value)
         if status != StatusCode.SUCCESS:
             logging.debug('TX-DATA: %s' % StatusCode[status])
             raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
@@ -301,6 +300,7 @@ class UsbProtocolMixin(ProtocolMixin):
         logging.debug('RX-CMD [%02d]: %s', len(rx_payload), atos(rx_payload))
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)
+        logging.debug('status: %#x, value: %#x', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
                 logging.info('RX-CMD: %s', StatusCode[status])
@@ -331,6 +331,7 @@ class UsbProtocolMixin(ProtocolMixin):
 
             # if rep_id != HID_REPORT['DATA_IN']:
             #     status, value = self.parse_response_payload(rx_payload)
+            #     logging.debug('status: %#x, value: %#x', status, value)
             #     if StatusCode.is_valid(status):
             #         logging.info('RX-DATA: %s' % StatusCode.desc(status))
             #         raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
@@ -357,6 +358,7 @@ class UsbProtocolMixin(ProtocolMixin):
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)
+        logging.debug('status: %#x, value: %#x', status, value)
         if status != StatusCode.SUCCESS:
             if StatusCode.is_valid(status):
                 logging.info('RX-DATA: %s' % StatusCode.desc(status))
@@ -403,6 +405,7 @@ class UsbProtocolMixin(ProtocolMixin):
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)
+        logging.debug('status: %#x, value: %#x', status, value)
         if status != StatusCode.SUCCESS:
                 logging.info('TX-DATA: %s' % StatusCode[status])
                 raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
