@@ -37,7 +37,11 @@ def check_method_arg_number(func, args_len):
         func_args_len -= 1
 
     # Subtract the number of arguments with default values
-    min_func_args_len = func_args_len - len(func.__defaults__)
+    # min_func_args_len = func_args_len - len(getattr(func, '__defaults__', ''))
+    if func.__defaults__:
+        min_func_args_len = func_args_len - len(func.__defaults__)
+    else:
+        min_func_args_len = func_args_len
 
     if min_func_args_len <= args_len <= func_args_len:
         return True
@@ -138,7 +142,7 @@ def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
     msg.append((' ' + '-' * (13 + 4 * length)))
     return '\n'.join(msg)
 
-def read_file(filename, address):
+def read_file(filename, address=None):
     in_data = bincopy.BinFile()
     try:
         if filename.lower().endswith(('.srec', '.s19')):

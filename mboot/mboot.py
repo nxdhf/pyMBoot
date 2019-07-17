@@ -272,6 +272,13 @@ class McuBoot(object):
         """
         if length == 0:
             raise ValueError('Data len is zero')
+        try:
+            temp = int(filename, 0)
+        except Exception:
+            pass
+        else:
+            filename = None
+            memory_id = temp
         logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=0x%X | memoryId = 0x%X ]', start_address, length, memory_id)
         # Prepare ReadMemory command
         cmd = struct.pack('<4B3I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x03, start_address, length, memory_id)
@@ -368,8 +375,6 @@ class McuBoot(object):
         cmd = struct.pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memory_id)
         # Process FillMemory command
         raw_value = self._itf_.write_cmd(cmd)
-
-        print(raw_value)
 
         logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_value))
         return raw_value
