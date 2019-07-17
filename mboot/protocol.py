@@ -97,6 +97,7 @@ class UartProtocolMixin(ProtocolMixin):
 
         # log RX raw command data
         logging.debug('RX-CMD [%02d]: %s', len(rxpkg), atos(rxpkg))
+        self.last_cmd_response = rxpkg
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(rxpkg)
@@ -133,6 +134,7 @@ class UartProtocolMixin(ProtocolMixin):
             data.extend(pkg)
             n += 0x20
         head, pkg = self.read(FPType.CMD)
+        self.last_cmd_response = pkg
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(pkg)
@@ -165,6 +167,7 @@ class UartProtocolMixin(ProtocolMixin):
             start = end
             n -= max_packet_size
         head, pkg = self.read(FPType.CMD)
+        self.last_cmd_response = pkg
 
         status, value = self.parse_response_payload(pkg)
         logging.debug('status: %#x, value: %#x', status, value)
@@ -298,6 +301,8 @@ class UsbProtocolMixin(ProtocolMixin):
 
         # log RX raw command data
         logging.debug('RX-CMD [%02d]: %s', len(rx_payload), atos(rx_payload))
+        self.last_cmd_response = rx_payload
+        
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)
         logging.debug('status: %#x, value: %#x', status, value)
@@ -355,6 +360,8 @@ class UsbProtocolMixin(ProtocolMixin):
         except:
             logging.info('RX-DATA: USB Disconnected')
             raise McuBootTimeOutError('USB Disconnected')
+        
+        self.last_cmd_response = rx_payload
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)
@@ -402,6 +409,8 @@ class UsbProtocolMixin(ProtocolMixin):
         except:
             logging.info('TX-DATA: USB Disconnected')
             raise McuBootTimeOutError('USB Disconnected')
+
+        self.last_cmd_response = rx_payload
 
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)

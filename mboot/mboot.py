@@ -24,8 +24,7 @@ from .memorytool import MemoryBlock, Memory, Flash
 # Helper functions
 ########################################################################################################################
 
-def decode_property_value(property_tag, raw_value):
-
+def decode_property_value(property_tag, raw_value, memory_id=None, last_cmd_response=None):
     if property_tag == PropertyTag.CURRENT_VERSION:
         str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF, (raw_value >> 8) & 0xFF, raw_value & 0xFF)
 
@@ -51,7 +50,16 @@ def decode_property_value(property_tag, raw_value):
     elif property_tag in (PropertyTag.RAM_START_ADDRESS, PropertyTag.FLASH_START_ADDRESS,
                           PropertyTag.SYSTEM_DEVICE_IDENT):
         str_value = '0x{:08X}'.format(raw_value)
-
+    
+    elif property_tag == PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES and memory_id:
+        # start_address, total_size, _, _, block_size
+        result = struct.unpack_from('<5L', last_cmd_response, 12) # upack(<'4B7L',last_cmd_response)
+        start_address, total_size, _, _, block_size = result
+        str_value = ''' External Memory Attributes:
+                    Memory Id: 0x{:X}
+                    Start Address: 0x{:08X}
+                    Total Size: 0x{:08X} KB = {:5.3f} GB
+                    Block Size: 0x{:X} Bytes'''.format(memory_id, result[0], result[1], result[1]/1024/1024, result[4])
     else:
         str_value = '{:d}'.format(raw_value)
 
@@ -241,6 +249,16 @@ class McuBoot(object):
 
         return mcu_info
 
+    def get_exmemory_info(self, memory_id):
+        try:
+            raw_value = self.get_property(PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES, memory_id)
+            str_value = decode_property_value(PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES, raw_value, memory_id, self._itf_.last_cmd_response)
+        except McuBootCommandError:
+            pass
+        str_list = [' ' + value.strip() for value in str_value.split('\n')]
+        str_value = '\n '.join(str_list)
+        return str_value
+
     def flash_erase_all(self, memory_id = 0):
         """ KBoot: Erase complete flash memory without recovering flash security section
         CommandTag: 0x01
@@ -376,7 +394,8 @@ class McuBoot(object):
         # Process FillMemory command
         raw_value = self._itf_.write_cmd(cmd)
 
-        logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_value))
+        logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, 
+            raw_value, memory_id, self._itf_.last_cmd_response))
         return raw_value
 
     def set_property(self, prop_tag, value, memory_id = 0):

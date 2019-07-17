@@ -126,7 +126,7 @@ def parse_args(parser, subparsers, command=None):
         parser._parse_known_args(list(argv), namespace=n)
     return args
 
-def info(kb):
+def info(kb, memory_id):
     nfo = kb.get_mcu_info()
     # Print KBoot MCU Info
     for key, value in nfo.items():
@@ -136,6 +136,9 @@ def info(kb):
         else:
             m += "\n  = {}".format(value)
         print(m)
+    if memory_id:
+        info = kb.get_exmemory_info(memory_id)
+        print(info)
 
 def write(kb, address, filename, memory_id=0, offset=0):
     kb.get_memory_range()
@@ -424,6 +427,8 @@ def main():
     subparsers = parser.add_subparsers(title='MCU Boot User Interface', prog='mboot [options]')
     
     parser_info = subparsers.add_parser('info', help='Get MCU info (mboot properties)', add_help=False)
+    parser_info.add_argument('memory_id', nargs='?', type=check_int, default=0, 
+        help='External memory id, Display external memory information if it is already executed configure-memory')
     parser_info.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
     parser_write = subparsers.add_parser('write', help='Write data into MCU memory', add_help=False)
@@ -490,7 +495,7 @@ def main():
     # kb.get_memory_range()
 
     if cmd.info:
-        info(kb)
+        info(kb, cmd.info.memory_id)
 
     if cmd.write:
         args = cmd.write
