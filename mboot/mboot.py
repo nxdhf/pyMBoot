@@ -245,7 +245,7 @@ class McuBoot(object):
         """ KBoot: Erase complete flash memory without recovering flash security section
         CommandTag: 0x01
         """
-        logging.info('TX-CMD: FlashEraseAll [ memoryId=%d ]', memory_id)
+        logging.info('TX-CMD: FlashEraseAll [ memoryId = 0x%X ]', memory_id)
         # Prepare FlashEraseAll command
         cmd = struct.pack('4BI', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00, memory_id)
         # Process FlashEraseAll command
@@ -257,7 +257,7 @@ class McuBoot(object):
         :param start_address: Start address
         :param length: Count of bytes
         """
-        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=0x%X | memoryId=%d ]', start_address, length, memory_id)
+        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=0x%X | memoryId = 0x%X ]', start_address, length, memory_id)
         # Prepare FlashEraseRegion command
         cmd = struct.pack('<4B3I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length, memory_id)
         # Process FlashEraseRegion command
@@ -272,7 +272,7 @@ class McuBoot(object):
         """
         if length == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=0x%X | memoryId=%d ]', start_address, length, memory_id)
+        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=0x%X | memoryId = 0x%X ]', start_address, length, memory_id)
         # Prepare ReadMemory command
         cmd = struct.pack('<4B3I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x03, start_address, length, memory_id)
         # Process ReadMemory command
@@ -298,7 +298,7 @@ class McuBoot(object):
             data = filename
         if len(data) == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=0x%x | memoryId=%d ]', address, len(data), memory_id)
+        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=0x%x | memoryId = 0x%X ]', address, len(data), memory_id)
         # Prepare WriteMemory command
         cmd = struct.pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, address, len(data), memory_id)
         # Process WriteMemory command
@@ -328,7 +328,7 @@ class McuBoot(object):
         except struct.error as e:
             raise McuBootGenericError('Pattern 0x{:08X} does not match unit {}'.format(pattern, unit))
 
-        logging.info('TX-CMD: FillMemory [ address=0x%08X | len=0x%#X | patern=0x%08X | unit=%s ]', 
+        logging.info('TX-CMD: FillMemory [ address=0x%08X | len=0x%X | patern=0x%08X | unit=%s ]', 
             start_address, length, pattern, unit)
         # Prepare FillMemory command
         cmd = struct.pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, _pattern)
@@ -357,7 +357,7 @@ class McuBoot(object):
         :param memory_id:
         :return {dict} with 'RAW' and 'STRING/LIST' value
         """
-        logging.info('TX-CMD: GetProperty->%s [ PropertyTag: %d | memoryId = %d ]', 
+        logging.info('TX-CMD: GetProperty->%s [ PropertyTag: %d | memoryId = 0x%X ]', 
             PropertyTag[prop_tag], PropertyTag[PropertyTag[prop_tag]], memory_id)
         # Prepare GetProperty command
         # if memory_id is None:
@@ -378,7 +378,7 @@ class McuBoot(object):
         :param  property_tag: The property ID (see Property enumerator)
         :param  value: The value of selected property
         """
-        logging.info('TX-CMD: SetProperty->%s = %d [ memoryId = %d ]', PropertyTag[prop_tag], value, memory_id)
+        logging.info('TX-CMD: SetProperty->%s = %d [ memoryId = 0x%X ]', PropertyTag[prop_tag], value, memory_id)
         # Prepare SetProperty command
         cmd = struct.pack('<4B3I', CommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value, memory_id)
         # Process SetProperty command
@@ -513,12 +513,16 @@ class McuBoot(object):
         # Process Read Data
         return self._itf_.read_data(length)
 
-    def configure_memory(self):
+    def configure_memory(self, memory_id, address):
+        '''KBoot: Configure external memory
+        memory_id: external memory id
+        address: the address of configuration block
         '''
-        CommandTag: 0x11
-        '''
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"configure_memory()\" not implemented yet')
+        logging.info('TX-CMD: ConfigureMemory [ memoryId=0x%08X | Address=0x%08X ]', memory_id, address)
+        # Prepare ConfigureMemory command
+        cmd = struct.pack('<4B2I', CommandTag.CONFIGURE_MEMORY, 0x00, 0x00, 0x02, memory_id, address)
+        # Process ConfigureMemory command
+        raw_value = self._itf_.write_cmd(cmd)
 
     def reliable_update(self):
         '''
