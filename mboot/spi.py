@@ -4,12 +4,12 @@ from pyftdi.spi import SpiController
 from struct import pack, unpack
 from .misc import atos
 from .protocol import FPType, UartProtocolMixin
-from .exception import McuBootDataError, McuBootCommandError
+from .exception import McuBootDataError
 from .enums import StatusCode
 
 # 5A-A6-5A-A4-0C-00-4B-33-07-00-00-02-01-00-00-00-00-00-00-00
 class SPI(UartProtocolMixin):
-    def __init__(self, freq=500*1000, mode=0):
+    def __init__(self, freq=1000*1000, mode=0):
         self.mode = mode
         self.freq = int(freq, 0) if isinstance(freq, str) else freq
         self.controller = None
@@ -133,16 +133,12 @@ class SPI(UartProtocolMixin):
         packet_type = self.slave.read(1)[0]
         if not packet_type == FPType.ACK:
             if packet_type == FPType.ABORT:
-                raise McuBootDataError(mode='write', errname=StatusCode[0x2712])
+                raise McuBootDataError(mode='read', errname=StatusCode[0x2712])
             else:
-                raise EnvironmentError()
+                raise McuBootDataError('recevice ack error, packet_type={!s}(0x{:X})'
+                    .format(FPType(packet_type), packet_type))
         else:
             logging.debug('SPI-IN-ACK[2]: 5A A1')
-    
-    @staticmethod
-    def parse_framing(head):
-        _, _packet_type, payload_len, crc = unpack('<2B2H', head)
-        return _packet_type, crc
 
     def _read_command_packet(self, length=20, rx_ack=True, tx_ack=False):
         data = self.slave.read(length).tobytes()

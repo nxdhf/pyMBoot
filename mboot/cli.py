@@ -2,6 +2,7 @@ import sys
 import argparse
 import pyftdi
 import mboot
+import serial.tools.list_ports
 
 import logging
 from .exception import McuBootGenericError, McuBootConnectionError
@@ -15,12 +16,34 @@ DEVICES = {
     'MKL27': (0x15A2, 0x0073),
     'LPC55': (0x1FC9, 0x0021),
     'K82F' : (0x15A2, 0x0073),
-    '232h' : (0x403,0x6014)
+    # '232h' : (0x403,0x6014),
+    'KE16Z': (0x0D28, 0x0204)   # uart
+}
+
+FTDI = {
+    '232'       : (0x0403, 0x6001),
+    '232r'      : (0x0403, 0x6001),
+    '232h'      : (0x0403, 0x6014),
+    '2232'      : (0x0403, 0x6010),
+    '2232d'     : (0x0403, 0x6010),
+    '2232h'     : (0x0403, 0x6010),
+    '4232'      : (0x0403, 0x6011),
+    '4232h'     : (0x0403, 0x6011),
+    '230x'      : (0x0403, 0x6015),
+    'ft232'     : (0x0403, 0x6001),
+    'ft232r'    : (0x0403, 0x6001),
+    'ft232h'    : (0x0403, 0x6014),
+    'ft2232'    : (0x0403, 0x6010),
+    'ft2232d'   : (0x0403, 0x6010),
+    'ft2232h'   : (0x0403, 0x6010),
+    'ft4232'    : (0x0403, 0x6011),
+    'ft4232h'   : (0x0403, 0x6011),
+    'ft230x'    : (0x0403, 0x6015)
 }
 
 peripheral_speed = {
     'usb'   : 12000000,
-    'uart'  : 115200,
+    'uart'  : 57600,
     'i2c'   : 400,
     'spi'   : 1000000,
     'can'   : 500
@@ -32,18 +55,26 @@ def parse_port(peripheral, arg):
         if not peripheral == 'uart':
              raise('Uart port setting error. (port = {})'.format(arg))
     elif len(port.split(':')) == 2:
-            port = tuple(port.split(':'))
+        str_list = port.split(':')
+        port = (int(str_list[0],0), int(str_list[1], 0))
+        # port = tuple(port.split(':'))
     elif len(port.split(',')) == 2:
-            port = tuple(port.split(','))
+        str_list = port.split(',')
+        port = (int(str_list[0],0), int(str_list[1], 0))
     else:
         raise('Parse port fail. (port = {})'.format(arg))
     return port
 
 def parse_peripheral(peripheral, args, func=None):
     port = None
-    product_name = 'UNKOWN'
+    product_name = peripheral
     speed = peripheral_speed[peripheral.lower()]
-    args_len = len(args)
+    # May enter a str instead of a list
+    if isinstance(args, str):
+        args_len = 1
+    else:
+        args_len = len(args)
+
     if args_len == 2:
         port, speed = args
         port = parse_port(peripheral, port)
@@ -60,8 +91,8 @@ def parse_peripheral(peripheral, args, func=None):
     if isinstance(port, str):
         info = ' DEVICE: {0:s} ({1:s})'.format(product_name, port)
     else:   # tuple or list
-        info = ' DEVICE: {0:s} ({p[0]:#04X}, {p[1]:#04X}) {1:d}'.format(product_name, speed, p=port)
-    # print(info)
+        info = ' DEVICE: {0:s} (0x{p[0]:04X}, 0x{p[1]:04X}) {1:d}'.format(product_name, speed, p=port)
+    print(info)
     return port, speed
 
 def scan_usb():
@@ -83,15 +114,40 @@ def scan_usb():
         device.close()
     return product_name, vid_pid
 
+def scan_uart():
+    all_devices = serial.tools.list_ports.comports()
+    device_list = [device for device in all_devices if device.vid and device.pid]
+
+    possible_device = []
+    for device in device_list:
+        for vid_pid in set(DEVICES.values()):
+            if device.vid == vid_pid[0] and device.pid == vid_pid[1]:
+                possible_device.append(device)
+                break
+    if not possible_device:
+        raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
+    index = 0
+    if len(possible_device) > 1:
+        for i, device in enumerate(possible_device, 0):
+            info = ' {0:d}) {d.manufacturer:s} {d.description:s} (0x{d.vid:04X}, 0x{d.pid:04X})'.format(i, d = device)
+            print(info)
+        choose = input('\n Select: ')
+        index = int(choose, 10)
+    selected_device = possible_device[index]
+    product_name = '{d.manufacturer:s} {d.description:s}'.format(
+        d = selected_device).rsplit(' (', 1)[0]
+    port = selected_device.device  # port or (vid, pid)
+    return product_name, port
+
 def scan_spi():
-    value = set(DEVICES.values())
+    value = set(FTDI.values())
     devices = pyftdi.usbtools.UsbTools.find_all(value)
-    if not devices:
-        raise McuBootConnectionError("\n - Target not detected !")
+    if not devices: # not use, UsbTools will throw an error
+        raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
     index = 0
     if len(devices) > 1:
         for i, device in enumerate(devices, 0):
-            info = ' {0:d}) {p[-1]:s} ({p[1]:#04X}, {p[2]:#04X})'.format(i, d = device)
+            info = ' {0:d}) {d[-1]:s} ({d[1]:#04X}, {d[2]:#04X})'.format(i, d = device)
             print(info)
         c = input('\n Select: ')
         index = int(c, 10)
@@ -232,26 +288,32 @@ class MBootHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
             if action.metavar is None:
                 result = '[%s [%s ...]]' % get_metavar(2)
             else:
-                metavar_len = len(action.metavar)
+                if isinstance(action.metavar, str):
+                    metavar_len = 1
+                else:
+                    metavar_len = len(action.metavar)
                 if metavar_len == 1:
-                    result = '[%s]' % get_metavar(2)
+                    result = '[%s]' % get_metavar(1)
                 elif metavar_len > 1:
                     f_string = ' [%s]' * (metavar_len - 1)
                     f_string = '[%s{}]'.format(f_string)
-                    result = f_string % get_metavar(2)
+                    result = f_string % get_metavar(metavar_len)
                 else:
                     raise ValueError('The "metavar" attribute cannot provide an empty tuple.')
         elif action.nargs == argparse.ONE_OR_MORE:
             if action.metavar is None:
                 result = '[%s [%s ...]]' % get_metavar(2)
             else:
-                metavar_len = len(action.metavar)
+                if isinstance(action.metavar, str):
+                    metavar_len = 1
+                else:
+                    metavar_len = len(action.metavar)
                 if metavar_len == 1:
-                    result = '[%s]' % get_metavar(2)
+                    result = '[%s]' % get_metavar(1)
                 elif metavar_len > 1:
                     f_string = ' [%s]' * (metavar_len - 1)
                     f_string = '[%s{}]'.format(f_string)
-                    result = f_string % get_metavar(2)
+                    result = f_string % get_metavar(metavar_len)
                 else:
                     raise ValueError('The "metavar" attribute cannot provide an empty tuple.')
         elif action.nargs == argparse.REMAINDER:
@@ -410,7 +472,7 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-u', '--usb', nargs='?', const=[], default=None, 
         help='Use usb peripheral, such as "-u VIDPID", "-u"', metavar='vid,pid')
-    group.add_argument('-p', '--uart', nargs='*', help='Use uart peripheral', metavar=('vid,pid', 'speed'))
+    group.add_argument('-p', '--uart', nargs='*', help='Use uart peripheral', metavar=('port', 'speed'))
     group.add_argument('-s', '--spi', nargs='*', help='Use spi peripheral, '
         'such as "-s VIDPID SPEED", "-s VIDPID", "-s SPEED", "-s"', metavar=('vid,pid', 'speed'))
     group.add_argument('-i', '--i2c', nargs='*', help='Use i2c peripheral', metavar=('vid,pid', 'speed'))
@@ -483,10 +545,11 @@ def main():
         device = RawHID.enumerate(*port)[0]
         kb.open_usb(device)
     elif cmd.uart is not None:
-        pass
+        port, baudrate = parse_peripheral('uart', cmd.uart, scan_uart)
+        kb.open_uart(port, baudrate)
     elif cmd.spi is not None:
-        port, speed = parse_peripheral('spi', cmd.spi, scan_spi)
-        kb.open_spi(port, speed, 0)
+        vid_pid, speed = parse_peripheral('spi', cmd.spi, scan_spi)
+        kb.open_spi(vid_pid, speed, 0)
     elif cmd.i2c is not None:
         pass
     else:

@@ -180,13 +180,14 @@ class McuBoot(object):
         """ KBoot: Connect by UART
         """
         if port is not None:
-            self._uart_dev = UART()
-            self._uart_dev.open(port, baudrate)
-            if self._uart_dev.ping():
-                return True
-            else:
-                self.close()
-                return False
+            self._itf_ = UART()
+            self._itf_.open(port, baudrate)
+            # if self._uart_dev.ping():
+            #     return True
+            # else:
+            #     self.close()
+            #     return False
+            return True
         else:
             logging.info('UART Disconnected !')
             return False

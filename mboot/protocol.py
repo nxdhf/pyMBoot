@@ -52,6 +52,11 @@ class UartProtocolMixin(ProtocolMixin):
         head += (cls._gen_crc(head, payload))
         return head + payload
 
+    @staticmethod
+    def parse_framing(head):
+        _, _packet_type, payload_len, crc = struct.unpack('<2B2H', head)
+        return _packet_type, crc
+
     def read_cmd(self, **kwargs):
         '''Receive the command packet (only need to receive the packet when an error occurs)
         Implemented but not called, The process is implemented in read_data, write_data
@@ -302,7 +307,7 @@ class UsbProtocolMixin(ProtocolMixin):
         # log RX raw command data
         logging.debug('RX-CMD [%02d]: %s', len(rx_payload), atos(rx_payload))
         self.last_cmd_response = rx_payload
-        
+
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)
         logging.debug('status: %#x, value: %#x', status, value)
