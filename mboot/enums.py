@@ -34,7 +34,7 @@ class CommandTag(Enum):
     RELIABLE_UPDATE = (0x12, 'ReliableUpdate', 'Reliable Update')
     GENERATE_KEY_BLOB = (0x13, 'GenerateKeyBlob', 'Generate Key Blob')
     KEY_PROVISIONING = (0x15, 'KeyProvisioning', 'Key Provisioning')
-    LOAD_IMAGE = (0x16, 'LoadImage', 'Load Image')
+    Flash_IMAGE = (0x16, 'FlashImage', 'Flash Image')
 
     GENERIC_RESPONSE = (0xA0, 'GenericResponse', 'Generic Response')
     FLASH_READ_ONCE_RESPONSE = (0xAF, 'FlashReadOnceResponse', 'Flash Read Once Response')
@@ -156,7 +156,18 @@ class StatusCode(Enum):
     MEMORY_RANGE_INVALID = (10200, 'MemoryRangeInvalid', 'Memory Range Invalid')
     MEMORY_READ_FAILED = (10201, 'MemoryReadFailed', 'Memory Read Failed')
     MEMORY_WRITE_FAILED = (10202, 'MemoryWriteFailed', 'Memory Write Failed')
-    MEMORY_UNSUPPORTED_COMMAND = (10213, 'MemoryUnsupportedCommand', 'Memory Unsupport Command, Such As Flash Erase')
+    MEMORY_CUMULATIVE_WRITE = (10203, 'MemoryCumulativeWrite', 'Memory Cumulative Write')
+    MEMORY_APP_OVERLAP_WITH_EXECUTE_ONLY_REGION = (10204, 'MemoryAppOverlapWithExecuteOnlyRegion', 'Memory App Overlap With Execute Only Region')
+    MEMORY_NOT_CONFIGURED = (10205, 'MemoryNotConfigured', 'Memory Not Configured')
+    MEMORY_ALIGNMENT_ERROR = (10206, 'MemoryAlignmentError', 'Memory Alignment Error')
+    MEMORY_VERIFY_FAILED = (10207, 'MemoryVerifyFailed', 'Memory Verify Failed')
+    MEMORY_WRITE_PROTECTED = (10208, 'MemoryWriteProtected', 'Memory Write Protected')
+    MEMORY_ADDRESS_ERROR = (10209, 'MemoryAddressError', 'Memory Address Error')
+    MEMORY_BLANK_CHECK_FAILED = (10210, 'MemoryBlankCheckFailed', 'Memory Blank Check Failed')
+    MEMORY_BLANK_PAGE_READ_DISALLOWED = (10211, 'MemoryBlankPageReadDisallowed', 'Memory Blank Page Read Disallowed')
+    MEMORY_PROTECTED_PAGE_READ_DISALLOWED = (10212, 'MemoryProtectedPageReadDisallowed', 'Memory Protected Page Read Disallowed')
+    MEMORY_FFR_SPEC_REGION_WRITE_BROKEN = (10213, 'MemoryFfrSpecRegionWriteBroken', 'Memory Ffr Spec Region Write Broken')
+    MEMORY_UNSUPPORTED_COMMAND = (10214, 'MemoryUnsupportedCommand', 'Memory Unsupported Command')
 
     # Property store errors.
     UNKNOWN_PROPERTY = (10300, 'UnknownProperty', 'Unknown Property')
@@ -169,3 +180,12 @@ class StatusCode(Enum):
     APP_CRC_CHECK_INACTIVE = (10402, 'AppCrcCheckInactive', 'Application CRC Check: Inactive')
     APP_CRC_CHECK_INVALID = (10403, 'AppCrcCheckInvalid', 'Application CRC Check: Invalid')
     APP_CRC_CHECK_OUT_OF_RANGE = (10404, 'AppCrcCheckOutOfRange', 'Application CRC Check: Out Of Range')
+
+    # Packetizer errors.
+    NO_PING_RESPONSE = (10500, 'NoPingResponse', 'No response received for ping command.')
+    INVALID_PACKET_TYPE = (10501, 'InvalidPacketType', 'Invalid packet type.')
+    INVALID_CRC = (10502, 'InvalidCRC', 'Invalid CRC value.')
+    NO_COMMAND_RESPONSE = (10503, 'NoCommandResponse', 'No response received for command.')
+
+    # Reliable update errors.
+    RELIABLE_UPDATE_SUCCESS = (10600, 'ReliableUpdateSuccess', 'Reliable Update Success')
