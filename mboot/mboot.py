@@ -11,6 +11,7 @@ import struct
 
 # relative imports
 from .enums import CommandTag, PropertyTag, StatusCode
+from .constant import KeyOperation
 from .misc import atos, size_fmt
 from .tool import read_file, write_file
 # from .protocol import UartProtocol, UsbProtocol, FPType
@@ -327,10 +328,12 @@ class McuBoot(object):
         logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=0x%x | memoryId = 0x%X ]', address, len(data), memory_id)
         # Prepare WriteMemory command
         cmd = struct.pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, address, len(data), memory_id)
+        # get max packet size
+        max_packet_size = self.get_property(PropertyTag.MAX_PACKET_SIZE, memory_id)
         # Process WriteMemory command
         self._itf_.write_cmd(cmd)
         # Process Write Data
-        return self._itf_.write_data(data)
+        return self._itf_.write_data(data, max_packet_size)
 
     def fill_memory(self, start_address, length, pattern=0xFFFFFFFF, unit='word'):
         """ KBoot: Fill MCU memory with specified pattern
@@ -421,10 +424,12 @@ class McuBoot(object):
         logging.info('TX-CMD: Receive SB file [ len=%d ]', len(data))
         # Prepare WriteMemory command
         cmd = struct.pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
+        # get max packet size
+        max_packet_size = self.get_property(PropertyTag.MAX_PACKET_SIZE)
         # Process WriteMemory command
         self._itf_.write_cmd(cmd)
         # Process Write Data
-        return self._itf_.write_data(data)
+        return self._itf_.write_data(data, max_packet_size)
 
     def execute(self, jump_address, argument, sp_address):
         """ KBoot: Fill MCU memory with specified pattern
@@ -568,16 +573,18 @@ class McuBoot(object):
         '''
         dek_data, _ = read_file(dek_file, 'no_address')
         # blob_data, _ = read_file(blob_file)
-        # Prepare ConfigureMemory command
+        # Prepare GenerateKeyBlob command
         logging.info('TX-CMD: GenerateKeyBlob [ dekFile=%s | blobFile=%s ]', dek_file, blob_file)
         # Prepare GenerateKeyBlob command
         cmd = struct.pack('<4B3I', CommandTag.GENERATE_KEY_BLOB, 0x01, 0x00, 0x03, 0x00, len(dek_data), 0x0)
+        # get max packet size
+        max_packet_size = self.get_property(PropertyTag.MAX_PACKET_SIZE)
         # Process GenerateKeyBlob command
         self._itf_.write_cmd(cmd)
         # Process Write Data
-        self._itf_.write_data(dek_data)
+        self._itf_.write_data(dek_data, max_packet_size)
 
-        # Prepare ConfigureMemory command
+        # Prepare GenerateKeyBlob command
         blob_len = 0x48
         cmd = struct.pack('<4B3I', CommandTag.GENERATE_KEY_BLOB, 0x00, 0x00, 0x03, 0x0, blob_len, 0x01)
         # Process GenerateKeyBlob command
@@ -586,12 +593,129 @@ class McuBoot(object):
         if blob_file:
             write_file(blob_file, data)
 
-    def key_provisioning(self):
+    def key_provisioning(self, operation, arg1=None, arg2=None, arg3=None):
+        '''The key-provisioning command is a pack of several security related commands.
+        • enroll
+        Example: -- key-provisioning enroll
+        Enroll key provisioning feature. No argument for this operation
+        • set_user_key <type><file>[,<size>]
+        Example: -- key-provisioning set_user_key 0xB userKey.bin
+        Send the user key specified by <type> to bootloader. <file> is the binary file containing user key plain text. If <size> is not specified,
+        the entire <file> will be sent, otherwise, blhost only sends the first <size> bytes
+        • set_key <type> <size>
+        Example: -- key-provisioning set_key 0x1 0x100
+        Generate <size> bytes of the key specified by <type>
+        • write_key_nonvolatile [memoryID]
+        Example: -- key-provisioning write_key_nonvolatile 0x110
+        Write the key to a nonvolatile memory
+        • read_key_nonvolatile [memoryID]
+        Example: -- key-provisioning read_key_nonvolatile 0x110
+        Load the key from a nonvolatile memory to bootloader
+        • write_key_store <file>[,<size>]
+        Send the key store to bootloader. <file> is the binary file containing key store. If <size> is not specified, the entire <file> will be
+        sent. Otherwise, only send the first <size> bytes
+        • read_key_store <file>
+        Read the key store from bootloader to host(PC). <file> is the binary file to store the key store
+        blhost Utility application
+        CommandTag: 0x15
+        :param operation: Performed operation, including 'enroll', 'set_user_key', 'set_key', 
+        'write_key_nonvolatile', 'read_key_nonvolatile', 'write_key_store', read_key_store
+        :param arg1: According to the corresponding operation, please refer to the above description
+        :param arg2: According to the corresponding operation, please refer to the above description
+        :param arg3: According to the corresponding operation, please refer to the above description
+        :param arg4: According to the corresponding operation, please refer to the above description
         '''
-        CommandTag: 0x14 ?? 0x15
-        '''
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"key_provisioning()\" not implemented yet')
+        try:
+            k_op = KeyOperation[operation.lower()].value
+        except KeyError:
+            raise McuBootGenericError('invalid operation arguments: {}'.format(operation))
+        
+        # Prepare KeyProvisioning command
+        logging.info('TX-CMD: KEY_PROVISIONING [ operation=%s ]', operation)
+        # Prepare KeyProvisioning command
+        if k_op == KeyOperation.enroll:
+            cmd = struct.pack('<4BI', CommandTag.KEY_PROVISIONING, 0x00, 0x00, 0x01, k_op)
+            # Process KeyProvisioning command
+            self._itf_.write_cmd(cmd)
+        elif k_op == KeyOperation.set_user_key:
+            if not arg1 or not arg2:
+                raise McuBootGenericError('invalid {} arguments'.format(operation))
+            key_type = arg1
+            key_file = arg2
+            if arg3 is None:
+                data, _ = read_file(key_file, 'no_address')
+                length = len(data)
+            else:
+                data, _ = read_file(key_file, 'no_address')
+                length = arg3
+                data = data[:length]
+
+            cmd = struct.pack('<4B3I', CommandTag.KEY_PROVISIONING, 0x01, 0x00, 0x03, k_op, key_type, length)
+            # get max packet size
+            max_packet_size = self.get_property(PropertyTag.MAX_PACKET_SIZE)
+            # Process KeyProvisioning command
+            self._itf_.write_cmd(cmd)
+            # Process Write Data
+            self._itf_.write_data(data, max_packet_size)
+        elif k_op == KeyOperation.set_key:
+            if not arg1 or not arg2 or arg3 is not None:
+                raise McuBootGenericError('invalid {} arguments'.format(operation))
+            key_type = arg1
+            key_size = arg2
+            cmd = struct.pack('<4B3I', CommandTag.KEY_PROVISIONING, 0x00, 0x00, 0x02, k_op, key_type, key_size)
+            # Process KeyProvisioning command
+            self._itf_.write_cmd(cmd)
+        elif k_op == KeyOperation.write_key_nonvolatile:
+            if arg2 is not None or arg3 is not None:
+                raise McuBootGenericError('invalid {} arguments'.format(operation))
+            if arg1 is None:
+                memory_id = 0
+            else:
+                memory_id = arg1
+            cmd = struct.pack('<4B2I', CommandTag.KEY_PROVISIONING, 0x00, 0x00, 0x02, k_op, memory_id)
+            # Process KeyProvisioning command
+            self._itf_.write_cmd(cmd)
+        elif k_op == KeyOperation.read_key_nonvolatile:
+            if arg2 is not None or arg3 is not None:
+                raise McuBootGenericError('invalid {} arguments'.format(operation))
+            if arg1 is None:
+                memory_id = 0
+            else:
+                memory_id = arg1
+            cmd = struct.pack('<4B2I', CommandTag.KEY_PROVISIONING, 0x00, 0x00, 0x02, k_op, memory_id)
+            # Process KeyProvisioning command
+            self._itf_.write_cmd(cmd)
+        elif k_op == KeyOperation.write_key_store:
+            if not arg1 or arg3 is not None:
+                raise McuBootGenericError('invalid {} arguments'.format(operation))
+            key_type = 0x0
+            key_file = arg1
+            if arg2 is None:
+                data, _ = read_file(key_file, 'no_address')
+                length = len(data)
+            else:
+                data, _ = read_file(key_file, 'no_address')
+                length = arg2
+                data = data[:length]
+            cmd = struct.pack('<4B3I', CommandTag.KEY_PROVISIONING, 0x01, 0x00, 0x03, k_op, key_type, length)
+            # get max packet size
+            max_packet_size = self.get_property(PropertyTag.MAX_PACKET_SIZE)
+            # Process KeyProvisioning command
+            self._itf_.write_cmd(cmd)
+            # Process Write Data
+            self._itf_.write_data(data, max_packet_size)
+        elif k_op == KeyOperation.read_key_store:
+            if not arg1 or arg2 is not None or arg3 is not None:
+                raise McuBootGenericError('invalid {} arguments'.format(operation))
+            key_file = arg1
+            cmd = struct.pack('<4BI', CommandTag.KEY_PROVISIONING, 0x00, 0x00, 0x01, k_op)
+            # Process KeyProvisioning command
+            length = self._itf_.write_cmd(cmd)
+            # Process Write Data
+            data = self._itf_.read_data(length)
+
+            write_file(key_file, data)
+            logging.info("Successfully saved into: {}".format(key_file))
 
     def load_image(self):
         '''

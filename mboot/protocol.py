@@ -136,8 +136,10 @@ class UartProtocolMixin(ProtocolMixin):
                     else:
                         logging.debug('RX-DATA: Unknown Error %d' % status)
                         raise McuBootDataError(mode='read', errval=status)
+                # else: # end of translate
+                #     break
             data.extend(pkg)
-            n += 0x20
+            n += len(pkg)
         head, pkg = self.read(FPType.CMD)
         self.last_cmd_response = pkg
 
