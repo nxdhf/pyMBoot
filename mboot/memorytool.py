@@ -69,7 +69,17 @@ class Memory(MemoryBlock):
     pass
 
 class Flash(MemoryBlock):
-    pass
+    def __init__(self, start, end=None, length=None, sector_size=0x1000):
+        super().__init__(start, end, length)
+        self.sector_size = sector_size
+
+    @staticmethod
+    def align_up(number, base):
+        return ((number + base -1) & (~(base-1)))
+
+    @staticmethod
+    def align_down(number, base):
+        return (number & (~(base-1)))
 
 if __name__ == "__main__":
     x = MemoryBlock(*[0,100])
@@ -80,5 +90,8 @@ if __name__ == "__main__":
     print((x-y)[0])
     print((x-y)[1])
     print(x,y)
+
+    z = Flash(*[0,0x1000])
+    print(z, hex(z.sector_size))
 
 

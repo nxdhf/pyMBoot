@@ -17,7 +17,8 @@ DEVICES = {
     'LPC55': (0x1FC9, 0x0021),
     'K82F' : (0x15A2, 0x0073),
     # '232h' : (0x403,0x6014),
-    'KE16Z': (0x0D28, 0x0204)   # uart
+    'KE16Z': (0x0D28, 0x0204),  # uart
+    'FPGA' : (0x1A86, 0x7523)   # uart
 }
 
 FTDI = {
@@ -159,12 +160,16 @@ def parse_args(parser, subparsers, command=None):
         command = sys.argv[1:]
     # Divide argv by commands
     split_argv = [[]]
-    for c in command:
-        if c in subparsers.choices:
-            split_argv.append([c])
-        else:
-            split_argv[-1].append(c)
-            # print(split_argv[-1])
+
+    if '-o' in command or '--origin' in command: # origin interface
+        split_argv[-1].extend(command)
+    else:
+        for c in command:
+            if c in subparsers.choices:
+                split_argv.append([c])
+            else:
+                split_argv[-1].append(c)
+                # print(split_argv[-1])
     # Initialize namespace
     args = argparse.Namespace()
     # Set command name, such as cmd1, cmd2..

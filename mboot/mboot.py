@@ -264,6 +264,7 @@ class McuBoot(object):
     def flash_erase_all(self, memory_id = 0):
         """ KBoot: Erase complete flash memory without recovering flash security section
         CommandTag: 0x01
+        :param memory_id: External memory id
         """
         logging.info('TX-CMD: FlashEraseAll [ memoryId = 0x%X ]', memory_id)
         # Prepare FlashEraseAll command
@@ -276,6 +277,7 @@ class McuBoot(object):
         CommandTag: 0x02
         :param start_address: Start address
         :param length: Count of bytes
+        :param memory_id: External memory id
         """
         logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=0x%X | memoryId = 0x%X ]', start_address, length, memory_id)
         # Prepare FlashEraseRegion command
@@ -288,6 +290,8 @@ class McuBoot(object):
         CommandTag: 0x03
         :param start_address: Start address
         :param length: Count of bytes
+        :param filename: The file to be read
+        :param memory_id: External memory id
         :return List of bytes
         """
         if length == 0:
@@ -316,6 +320,8 @@ class McuBoot(object):
         CommandTag: 0x04
         :param start_address: Start address
         :param data: List of bytes
+        :param filename: The file to be written
+        :param memory_id: External memory id
         :return Count of wrote bytes
         """
         if isinstance(filename, str):   # Enter the file name
@@ -383,7 +389,7 @@ class McuBoot(object):
         """ KBoot: Get value of specified property
         CommandTag: 0x07
         :param prop_tag: The property ID (see Property enumerator)
-        :param memory_id:
+        :param memory_id: External memory id
         :return {dict} with 'RAW' and 'STRING/LIST' value
         """
         logging.info('TX-CMD: GetProperty->%s [ PropertyTag: %d | memoryId = 0x%X ]', 
@@ -407,6 +413,7 @@ class McuBoot(object):
         CommandTag: 0x0C
         :param  property_tag: The property ID (see Property enumerator)
         :param  value: The value of selected property
+        :param memory_id: External memory id
         """
         logging.info('TX-CMD: SetProperty->%s = %d [ memoryId = 0x%X ]', PropertyTag[prop_tag], value, memory_id)
         # Prepare SetProperty command
@@ -548,7 +555,7 @@ class McuBoot(object):
     def configure_memory(self, memory_id, address):
         '''KBoot: Configure external memory
         CommandTag: 0x11
-        :param memory_id: external memory id
+        :param memory_id: External memory id
         :param address: the address of configuration block
         '''
         logging.info('TX-CMD: ConfigureMemory [ memoryId=0x%08X | Address=0x%08X ]', memory_id, address)
@@ -717,10 +724,38 @@ class McuBoot(object):
             write_file(key_file, data)
             logging.info("Successfully saved into: {}".format(key_file))
 
-    def load_image(self):
+    def flash_image(self, filename, erase='none', memory_id=0):
+        '''Write the formatted image in <file> to the memory specified by memoryID.
+        CommandTag: 0x16
+        :param filename: The file to be written, supported file types are S-Record (.srec and .s19), and Hex (.hex)
+        :param erase: Whether to erase before writing, there are two values ​​of 'erase' and 'none', and numbers are not supported.
+        :param memory_id: External memory id
         '''
-        CommandTag: 0x15 ??
-        '''
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"load_image()\" not implemented yet')
+        if isinstance(erase, int):
+            erase = False
+            memory_id = erase
+
+        data, address = read_file(filename, None)
+        data_len = len(data)
+        if data_len == 0:
+            raise ValueError('Data len is zero')
+
+        if erase == 'erase':
+            sector_size = self.get_property(PropertyTag.FLASH_SECTOR_SIZE, memory_id)
+            erase_len = Flash.align_up(data_len, sector_size)
+            self.flash_erase_region(address, erase_len, memory_id)
+        elif erase == 'none':
+            pass
+        else:
+            raise McuBootGenericError('invalid arguments: {}'.format(erase))
+
+        logging.info('TX-CMD: FlashImage [ filename=%s -> 0x%08X | erase=%s | memoryId = 0x%X ]', filename, address, erase, memory_id)
+        # Prepare WriteMemory command
+        cmd = struct.pack('<4B3I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, address, data_len, memory_id)
+        # get max packet size
+        max_packet_size = self.get_property(PropertyTag.MAX_PACKET_SIZE, memory_id)
+        # Process WriteMemory command
+        self._itf_.write_cmd(cmd)
+        # Process Write Data
+        return self._itf_.write_data(data, max_packet_size)
 
