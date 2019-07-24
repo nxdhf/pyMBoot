@@ -82,7 +82,7 @@ class UartProtocolMixin(ProtocolMixin):
                 raise McuBootCommandError(errval=status)
         return value
 
-    def write_cmd(self, payload, timeout=1000, **kwargs):
+    def write_cmd(self, payload, timeout=1000, status_success=StatusCode.SUCCESS, **kwargs):
         '''Send the cmd packet
         :param bytes payload: payload in the current packet
 
@@ -107,7 +107,7 @@ class UartProtocolMixin(ProtocolMixin):
         # Parse and validate status flag
         status, value = self.parse_response_payload(rxpkg)
         logging.debug('status: %#x, value: %#x', status, value)
-        if status != StatusCode.SUCCESS:
+        if status != status_success:
             if StatusCode.is_valid(status):
                 logging.debug('RX-CMD: %s', StatusCode[status])
                 raise McuBootCommandError(errname=StatusCode[status], errval=status)
@@ -291,7 +291,7 @@ class UsbProtocolMixin(ProtocolMixin):
     _pg_end = 100
     _abort = False
 
-    def write_cmd(self, payload, timeout=1000, **kwargs):
+    def write_cmd(self, payload, timeout=1000, status_success=StatusCode.SUCCESS, **kwargs):
         if self.device is None:
             logging.info('RX-DATA: Disconnected')
             raise McuBootConnectionError('Disconnected')
@@ -313,7 +313,7 @@ class UsbProtocolMixin(ProtocolMixin):
         # Parse and validate status flag
         status, value = self.parse_response_payload(rx_payload)
         logging.debug('status: %#x, value: %#x', status, value)
-        if status != StatusCode.SUCCESS:
+        if status != status_success:
             if StatusCode.is_valid(status):
                 logging.info('RX-CMD: %s', StatusCode[status])
                 raise McuBootCommandError(errname=StatusCode[status], errval=status)

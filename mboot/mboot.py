@@ -564,12 +564,17 @@ class McuBoot(object):
         # Process ConfigureMemory command
         raw_value = self._itf_.write_cmd(cmd)
 
-    def reliable_update(self):
-        '''
+    def reliable_update(self, address):
+        '''Checks the validity of backup application at <addr>, then copies the contents of 
+        backup application from <addr> to main application region
         CommandTag: 0x12
+        :param address: The address is the write address of the application(such as led demo file)
         '''
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"reliable_update()\" not implemented yet')
+        logging.info('TX-CMD: ReliableUpdate [ Address=0x%08X ]', address)
+        # Prepare ReliableUpdate command
+        cmd = struct.pack('<4BI', CommandTag.RELIABLE_UPDATE, 0x00, 0x00, 0x01, address)
+        # Process ReliableUpdate command(status_success = RELIABLE_UPDATE_SUCCESS, this is different from other commands)
+        raw_value = self._itf_.write_cmd(cmd, status_success=StatusCode.RELIABLE_UPDATE_SUCCESS)
 
     def generate_key_blob(self, dek_file, blob_file = None):
         '''Generate the blob for the given dek key -- dek.bin, and write the blob to the file -- blob.bin. 
