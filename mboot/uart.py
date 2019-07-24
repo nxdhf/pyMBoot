@@ -104,16 +104,16 @@ class UART(UartProtocolMixin):
         # data = self.protocol.genPacket(packet_type, payload)
         # self.ping()
         self.ser.write(data)  # The array 'data' will changed into a list during execution.
-        logging.debug('SPI-OUT-%s[%d]: %s', packet_type.name, len(data), atos(data))
+        logging.debug('UART-OUT-%s[%d]: %s', packet_type.name, len(data), atos(data))
         if rx_ack:
             self.receive_ack()
 
     def ping(self):
         ping = bytes(b'\x5A\xA6')
         self.ser.write(ping)
-        logging.debug('SPI-OUT-PING[%d]: %s', len(ping), atos(ping))
+        logging.debug('UART-OUT-PING[%d]: %s', len(ping), atos(ping))
         # data = self.ser.read(11)
-        # logging.debug('SPI-IN-PINGR-ORIGIN[%d]: %s', len(data), atos(data))
+        # logging.debug('UART-IN-PINGR-ORIGIN[%d]: %s', len(data), atos(data))
         # if data == b'\x00' * 11:
         #     pass    # The device has successfully handshake and does not need to repeat the handshake.
         # else:
@@ -126,6 +126,7 @@ class UART(UartProtocolMixin):
 
         start_byte = self.find_start_byte()
         data = start_byte + self.ser.read(9)
+        logging.debug('UART-OUT-PINGR[%d]: %s', len(data), atos(data))
         _, packet_type, *protocol_version, protocol_name, options, crc = unpack('<6B2H', data)
         if not packet_type == FPType.PINGR:
                 raise EnvironmentError
@@ -148,13 +149,13 @@ class UART(UartProtocolMixin):
         '''
         ack = bytes(b'\x5A\xA1')
         self.ser.write(ack)
-        logging.debug('SPI-OUT-ACK[%d]: %s', len(ack), atos(ack))
+        logging.debug('UART-OUT-ACK[%d]: %s', len(ack), atos(ack))
 
     def receive_ack(self):
         '''Used to receive ack after write phase
         '''
         # data = self.ser.read(0x50)
-        # logging.debug('SPI-IN-ORIGIN++[%d]: %s', len(data), atos(data))
+        # logging.debug('UART-IN-ORIGIN++[%d]: %s', len(data), atos(data))
         # start_index = data.find(0x5A)
         self.find_start_byte()
         packet_type = self.ser.read(1)[0]
@@ -165,7 +166,7 @@ class UART(UartProtocolMixin):
                 raise McuBootDataError('recevice ack error, packet_type={!s}(0x{:X})'
                     .format(FPType(packet_type), packet_type))
         else:
-            logging.debug('SPI-IN-ACK[2]: 5A A1')
+            logging.debug('UART-IN-ACK[2]: 5A A1')
 
     # def osend_ack(self, val=True):
     #     ack = [0x5A, 0xA1 if val == True else 0xA7]

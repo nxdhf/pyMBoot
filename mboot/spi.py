@@ -99,6 +99,7 @@ class SPI(UartProtocolMixin):
 
         start_byte = self.find_start_byte()
         data = start_byte.tobytes() + self.slave.read(9).tobytes()
+        logging.debug('SPI-OUT-PINGR[%d]: %s', len(data), atos(data))
         _, packet_type, *protocol_version, protocol_name, options, crc = unpack('<6B2H', data)
         if not packet_type == FPType.PINGR:
                 raise EnvironmentError
