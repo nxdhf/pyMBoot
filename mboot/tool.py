@@ -63,6 +63,50 @@ def convert_arg_to_int(cmd_args):
         args.append(arg)
     return args
 
+def check_key(value):
+    if value[0] == 'S':
+        if len(value) != 10:
+            # self.fail('Short key, use 16 ASCII chars !', param, ctx)
+            raise ValueError('Key type error, use 16 ASCII chars, such as "S:123...8"')
+        bdoor_key = [ord(k) for k in value[2:]]
+    elif value[0] == 'X':
+        if len(value) != 18:
+            # self.fail('Short key, use 32 HEX chars !', param, ctx)
+            raise ValueError('Key type error, use 32 HEX chars, such as "X:010203...08"')
+        value = value[2:]
+        bdoor_key = []
+        try:
+            for i in range(0, len(value), 2):
+                bdoor_key.append(int(value[i:i+2], 16))
+        except ValueError:
+            # self.fail('Unsupported HEX char in Key !', param, ctx)
+            raise ValueError('Unsupported HEX char in Key! ({})'.format(value))
+    else:
+        value_len = len(value)
+        if value_len == 8:
+            bdoor_key = [ord(k) for k in value[2:]]
+        elif value_len == 16:
+            bdoor_key = []
+            try:
+                for i in range(0, len(value), 2):
+                    bdoor_key.append(int(value[i:i+2], 16))
+            except ValueError:
+                # self.fail('Unsupported HEX char in Key !', param, ctx)
+                raise ValueError('Unsupported HEX char in Key! ({})'.format(value))
+        else:
+            raise ValueError('Key type error, Use backdoor key as "ASCII = S:123...8" or "HEX = X:010203...08"')
+    return bdoor_key
+
+def check_int(value):
+    # Convert hex str to int
+    # if isinstance(value, str):
+    try:
+        value = int(value, 0)
+    except ValueError:
+        raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
+    else:
+        return value
+
 def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
     """ Return string array in hex-dump format
     :param data:          {List} The data array of {Bytes}

@@ -13,7 +13,7 @@ import struct
 from .enums import CommandTag, PropertyTag, StatusCode
 from .constant import KeyOperation
 from .misc import atos, size_fmt
-from .tool import read_file, write_file
+from .tool import read_file, write_file, check_key
 # from .protocol import UartProtocol, UsbProtocol, FPType
 from .exception import McuBootGenericError, McuBootCommandError
 from .uart import UART
@@ -370,15 +370,15 @@ class McuBoot(object):
     def flash_security_disable(self, backdoor_key):
         """ KBoot: Disable flash security by backdoor key
         CommandTag: 0x06
-        :param backdoor_key:
+        :param backdoor_key: back door key string, such as "ASCII = S:123...8" or "HEX = X:010203...08"
         """
-        logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
+        if isinstance(backdoor_key, str):
+            key = check_key(backdoor_key)
+        logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(key))
         # Prepare FlashSecurityDisable command
         cmd = struct.pack('4B', CommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
-        if len(backdoor_key) < 8:
-            raise ValueError('Short range of backdoor key')
-        cmd += bytes(backdoor_key[3::-1])
-        cmd += bytes(backdoor_key[:3:-1])
+        cmd += bytes(key[3::-1])
+        cmd += bytes(key[:3:-1])
         # Process FlashSecurityDisable command
         self._itf_.write_cmd(cmd)
 

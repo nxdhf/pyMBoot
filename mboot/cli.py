@@ -6,7 +6,7 @@ import serial.tools.list_ports
 
 import logging
 from .exception import McuBootGenericError, McuBootConnectionError
-from .tool import check_method_arg_number, convert_arg_to_int, hexdump, read_file
+from .tool import check_method_arg_number, convert_arg_to_int, check_key, check_int, hexdump, read_file
 from .usb import RawHID
 from .enums import PropertyTag
 from .memorytool import MemoryBlock
@@ -357,43 +357,7 @@ class MBootHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
             return ', '.join(parts)
 
-def check_key(value):
-    if value[0] == 'S':
-        if len(value) < 18:
-            self.fail('Short key, use 16 ASCII chars !', param, ctx)
-        bdoor_key = [ord(k) for k in value[2:]]
-    else:
-        if len(value) < 34:
-            self.fail('Short key, use 32 HEX chars !', param, ctx)
-        value = value[2:]
-        bdoor_key = []
-        try:
-            for i in range(0, len(value), 2):
-                bdoor_key.append(int(value[i:i+2], 16))
-        except ValueError:
-            self.fail('Unsupported HEX char in Key !', param, ctx)
-    return bdoor_key
 
-def check_str(value):
-    try:
-        value = int(value, 0)
-    except ValueError:
-        pass
-    if isinstance(value, str):
-        return value
-    else:
-        # raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
-        pass
-
-def check_int(value):
-    # Convert hex str to int
-    # if isinstance(value, str):
-    try:
-        value = int(value, 0)
-    except ValueError:
-        raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
-    else:
-        return value
 
 class FixArgValue(argparse.Action):
     """Fix incorrect allocation of values ​​due to resolution reasons
@@ -604,7 +568,10 @@ def main():
         if func:
             cmd_args = cmd.origin[1:]
             if check_method_arg_number(func, len(cmd_args)):
-                args = convert_arg_to_int(cmd_args)
+                if attr == 'flash_security_disable':
+                    args = cmd_args
+                else:
+                    args = convert_arg_to_int(cmd_args)
                 data = func(*args)
                 if attr == 'read_memory':
                     print('\n', hexdump(data, args[0], False))
