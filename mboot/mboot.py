@@ -493,24 +493,24 @@ class McuBoot(object):
         # Process FlashEraseAllUnsecure command
         self._itf_.write_cmd(cmd)
 
-    def flash_read_once(self, index, byteCount):
+    def flash_read_once(self, index, byte_count):
         """ KBoot: Read from MCU flash program once region (max 8 bytes)
         CommandTag: 0x0F
         :param index: Start index
-        :param byteCount: Count of bytes
+        :param byte_count: Count of bytes
         :return The value read from the IRF
         """
-        if byteCount == 4:
+        if byte_count == 4:
             s_format = '<I'
             s_info = 'Response word: 0x{0:08X} ({0})'
-        elif byteCount == 8:
+        elif byte_count == 8:
             s_format = '<Q'
             s_info = 'Response word: 0x{0:016X} ({0})'
         else:
-            raise McuBootGenericError('invalid byteCount arguments: {}'.format(byteCount))
-        logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d ]', index, byteCount)
+            raise McuBootGenericError('invalid byte_count arguments: {}'.format(byte_count))
+        logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d ]', index, byte_count)
         # Prepare FlashReadOnce command
-        cmd = struct.pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, byteCount)
+        cmd = struct.pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, byte_count)
         # Process FlashReadOnce command
         self._itf_.write_cmd(cmd)
         # Process Response
@@ -528,29 +528,66 @@ class McuBoot(object):
         #     value_word_len -= 1
 
     def efuse_read_once(self, index):
-        """Read one word of OCOTP Field, 'efuse-program-once' is alias of flash-program-once
+        """Read one word of OCOTP Field, 'efuse_read_once' is alias of 'flash_read_once'
         :param index: Start index
         """
         return self.flash_read_once(index, 4)
 
-    def flash_program_once(self, index, data):
+    def flash_program_once(self, index, byte_count, data):
         """ KBoot: Write into MCU flash program once region (max 8 bytes)
         CommandTag: 0x0E
         :param index: Start index
-        :param data: List of bytes
+        :byte_count: Count of bytes
+        :param data: List of bytes or int
         """
-        length = len(data)
-        if (index + length) > 8:
-            length = 8 - index
-        if length == 0:
-            raise ValueError('Index out of range')
-        logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s ]', index, atos(data[:length]))
+        if isinstance(data, int):
+            # Detecting parameter correctness
+            data_len = len(hex(data)[2:])
+            if data_len <= 8:
+                byte_len = 4
+                if byte_len != byte_count:
+                    raise McuBootGenericError('byte_count do not match data!')
+                # s_format = '<I'
+            elif data_len <= 16:
+                byte_len = 8
+                if byte_len != byte_count:
+                    raise McuBootGenericError('byte_count do not match data!')
+            else:
+                raise McuBootGenericError('invalid data byte_count arguments: 0x{:X}'.format(data))
+            # Int convert to bytes
+            data_bytes = (data).to_bytes(byte_count, byteorder='little')
+        else:
+            # Detecting parameter correctness
+            data_len = len(data)
+            if data_len == 4:
+                if byte_len != byte_count:
+                    raise McuBootGenericError('byte_count do not match data!')
+            elif data_len == 8:
+                if byte_len != byte_count:
+                    raise McuBootGenericError('byte_count do not match data!')
+            else:
+                raise McuBootGenericError('invalid data byte_count arguments: 0x{0:X} ({0})'.format(int.from_bytes(data, byteorder='little')))
+            # Named alias
+            data_bytes = data
+        # length = len(data)
+        # if (index + length) > 8:
+        #     length = 8 - index
+        # if length == 0:
+        #     raise ValueError('Index out of range')
+        logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s ]', index, atos(data_bytes[:byte_count]))
         # Prepare FlashProgramOnce command
-        cmd = struct.pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
-        cmd += bytes(data)
+        cmd = struct.pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, byte_count)
+        cmd += bytes(data_bytes)
         # Process FlashProgramOnce command
         self._itf_.write_cmd(cmd)
         return length
+
+    def efuse_program_once(self, index, data):
+        """ KBoot: Write into MCU flash program once region (max 8 bytes), 'efuse-program-once' is alias of 'flash-program-once'
+        :param index: Start index
+        :param data: List of bytes or int
+        """
+        self.flash_program_once(index, 4, data)
 
     def flash_read_resource(self, start_address, length, option=1):
         """ KBoot: Read resource of flash module
