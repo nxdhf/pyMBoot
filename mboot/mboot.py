@@ -493,24 +493,45 @@ class McuBoot(object):
         # Process FlashEraseAllUnsecure command
         self._itf_.write_cmd(cmd)
 
-    def flash_read_once(self, index, length):
+    def flash_read_once(self, index, byteCount):
         """ KBoot: Read from MCU flash program once region (max 8 bytes)
         CommandTag: 0x0F
         :param index: Start index
-        :param length: Count of bytes
-        :return List of bytes
+        :param byteCount: Count of bytes
+        :return The value read from the IRF
         """
-        if (index + length) > 8:
-            length = 8 - index
-        if length == 0:
-            raise ValueError('Index out of range')
-        logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d ]', index, length)
+        if byteCount == 4:
+            s_format = '<I'
+            s_info = 'Response word: 0x{0:08X} ({0})'
+        elif byteCount == 8:
+            s_format = '<Q'
+            s_info = 'Response word: 0x{0:016X} ({0})'
+        else:
+            raise McuBootGenericError('invalid byteCount arguments: {}'.format(byteCount))
+        logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d ]', index, byteCount)
         # Prepare FlashReadOnce command
-        cmd = struct.pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
+        cmd = struct.pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, byteCount)
         # Process FlashReadOnce command
         self._itf_.write_cmd(cmd)
-        # Process Read Data
-        return self._itf_.read_data(length)
+        # Process Response
+        payload = self._itf_.last_cmd_response
+        word = struct.unpack_from(s_format, payload, 12)[0]
+        logging.info(s_info.format(word))
+        return word
+        # response_word_len = struct.unpack_from('<B', self._itf_.last_cmd_response,3)[0]
+        # value_word_len = response_word_len -2
+        # index = 12
+        # while value_word_len:
+        #     word = struct.unpack_from('<I', self._itf_.last_cmd_response, 12)[0]
+        #     logging.info('Response word: 0x{0:08X} ({0})'.format(word))
+        #     index += 4
+        #     value_word_len -= 1
+
+    def efuse_read_once(self, index):
+        """Read one word of OCOTP Field, 'efuse-program-once' is alias of flash-program-once
+        :param index: Start index
+        """
+        return self.flash_read_once(index, 4)
 
     def flash_program_once(self, index, data):
         """ KBoot: Write into MCU flash program once region (max 8 bytes)
