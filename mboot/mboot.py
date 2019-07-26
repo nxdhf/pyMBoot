@@ -497,7 +497,7 @@ class McuBoot(object):
         """ KBoot: Read from MCU flash program once region (max 8 bytes)
         CommandTag: 0x0F
         :param index: Start index
-        :param byte_count: Count of bytes
+        :param byte_count: Count of bytes, Must be 4-byte aligned.
         :return The value read from the IRF
         """
         if byte_count == 4:
@@ -537,7 +537,7 @@ class McuBoot(object):
         """ KBoot: Write into MCU flash program once region (max 8 bytes)
         CommandTag: 0x0E
         :param index: Start index
-        :byte_count: Count of bytes
+        :byte_count: Count of bytes, Must be 4-byte aligned.
         :param data: List of bytes or int
         """
         if isinstance(data, int):
@@ -589,23 +589,28 @@ class McuBoot(object):
         """
         self.flash_program_once(index, 4, data)
 
-    def flash_read_resource(self, start_address, length, option=1):
-        """ KBoot: Read resource of flash module
+    def flash_read_resource(self, start_address, byte_count, option=1, filename=None):
+        """ KBoot: Reads the contents of Flash IFR or Flash Firmware ID as specified 
+        by 'option' and writes result to file or stdout if 'filename' is not specified.
         CommandTag: 0x10
-        :param start_address:
-        :param length:
-        :param option:
-        :return resource list
+        :param start_address: start address
+        :param byte_count: Count of bytes, Must be 4-byte aligned.
+        :param option: Indicates which area to be read. 0 means Flash IFR, 1 means Flash Firmware ID.
+        :return resource data bytes
         """
-        logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
+        logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, byte_count)
         # Prepare FlashReadResource command
-        cmd = struct.pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
+        cmd = struct.pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, byte_count, option)
         # Process FlashReadResource command
         raw_value = self._itf_.write_cmd(cmd)
         rx_len = raw_value
-        length = min(length, rx_len)
+        length = min(byte_count, rx_len)
         # Process Read Data
-        return self._itf_.read_data(length)
+        data = self._itf_.read_data(length)
+        if filename:
+            write_file(filename, data)
+            logging.info("Successfully saved into: {}".format(filename))
+        return data
 
     def configure_memory(self, memory_id, address):
         '''KBoot: Configure external memory
