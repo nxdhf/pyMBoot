@@ -449,16 +449,15 @@ class McuBoot(object):
         # Process Execute command
         self._itf_.write_cmd(cmd)
 
-    def call(self, call_address, argument, sp_address):
+    def call(self, call_address, argument):
         """ KBoot: Fill MCU memory with specified pattern
         CommandTag: 0x0A
         :param call_address: Call address (must be word aligned)
         :param argument: Function arguments address
-        :param sp_address: Stack pointer address
         """
-        logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
+        logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X]', call_address, argument)
         # Prepare Call command
-        cmd = struct.pack('<4B3I', CommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
+        cmd = struct.pack('<4B2I', CommandTag.CALL, 0x00, 0x00, 0x02, call_address, argument)
         # Process Call command
         self._itf_.write_cmd(cmd)
 
