@@ -1,159 +1,13 @@
 import sys
 import argparse
-import pyftdi
 import mboot
-import serial.tools.list_ports
 
 import logging
-from .exception import McuBootGenericError, McuBootConnectionError
 from .tool import check_method_arg_number, convert_arg_to_int, check_key, check_int, hexdump, read_file
-from .usb import RawHID
 from .enums import PropertyTag
+from .constant import Interface
 from .memorytool import MemoryBlock
-
-DEVICES = {
-    # NAME   | VID   | PID
-    'MKL27': (0x15A2, 0x0073),
-    'LPC55': (0x1FC9, 0x0021),
-    'K82F' : (0x15A2, 0x0073),
-    # '232h' : (0x403,0x6014),
-    'KE16Z': (0x0D28, 0x0204),  # uart
-    'FPGA' : (0x1A86, 0x7523)   # uart
-}
-
-FTDI = {
-    '232'       : (0x0403, 0x6001),
-    '232r'      : (0x0403, 0x6001),
-    '232h'      : (0x0403, 0x6014),
-    '2232'      : (0x0403, 0x6010),
-    '2232d'     : (0x0403, 0x6010),
-    '2232h'     : (0x0403, 0x6010),
-    '4232'      : (0x0403, 0x6011),
-    '4232h'     : (0x0403, 0x6011),
-    '230x'      : (0x0403, 0x6015),
-    'ft232'     : (0x0403, 0x6001),
-    'ft232r'    : (0x0403, 0x6001),
-    'ft232h'    : (0x0403, 0x6014),
-    'ft2232'    : (0x0403, 0x6010),
-    'ft2232d'   : (0x0403, 0x6010),
-    'ft2232h'   : (0x0403, 0x6010),
-    'ft4232'    : (0x0403, 0x6011),
-    'ft4232h'   : (0x0403, 0x6011),
-    'ft230x'    : (0x0403, 0x6015)
-}
-
-peripheral_speed = {
-    'usb'   : 12000000,
-    'uart'  : 57600,
-    'i2c'   : 400,
-    'spi'   : 1000000,
-    'can'   : 500
-}
-
-def parse_port(peripheral, arg):
-    port = arg.lower()
-    if port.startswith('com') or port.startswith('/dev/'):
-        if not peripheral == 'uart':
-             raise('Uart port setting error. (port = {})'.format(arg))
-    elif len(port.split(':')) == 2:
-        str_list = port.split(':')
-        port = (int(str_list[0],0), int(str_list[1], 0))
-        # port = tuple(port.split(':'))
-    elif len(port.split(',')) == 2:
-        str_list = port.split(',')
-        port = (int(str_list[0],0), int(str_list[1], 0))
-    else:
-        raise('Parse port fail. (port = {})'.format(arg))
-    return port
-
-def parse_peripheral(peripheral, args, func=None):
-    port = None
-    product_name = peripheral
-    speed = peripheral_speed[peripheral.lower()]
-    # May enter a str instead of a list
-    if isinstance(args, str):
-        args_len = 1
-    else:
-        args_len = len(args)
-
-    if args_len == 2:
-        port, speed = args
-        port = parse_port(peripheral, port)
-    elif args_len == 1:
-        if args[0].isdigit():
-            speed = int(args[0], 0)
-        else:
-            port = args[0]
-            port = parse_port(peripheral, port)
-    elif args_len > 2:
-        raise('peripheral length error. (peripheral = {})'.format(args))
-    if port == None and func:
-        product_name, port = func()
-    if isinstance(port, str):
-        info = ' DEVICE: {0:s} ({1:s})'.format(product_name, port)
-    else:   # tuple or list
-        info = ' DEVICE: {0:s} (0x{p[0]:04X}, 0x{p[1]:04X}) {1:d}'.format(product_name, speed, p=port)
-    print(info)
-    return port, speed
-
-def scan_usb():
-    devices = []
-    for name, value in DEVICES.items():
-        # print(name, value[0], value[1])
-        devices += RawHID.enumerate(value[0], value[1])
-    if not devices:
-        raise McuBootConnectionError("\n - Target not detected !")
-    index = 0
-    if len(devices) > 1:
-        for i, device in enumerate(devices, 0):
-            print(' {0:d}) {1:s}'.format(i, device.info()))
-        c = input('\n Select: ')
-        index = int(c, 10)
-    product_name = devices[index].product_name
-    vid_pid = (devices[index].vid, devices[index].pid)
-    for device in devices:
-        device.close()
-    return product_name, vid_pid
-
-def scan_uart():
-    all_devices = serial.tools.list_ports.comports()
-    device_list = [device for device in all_devices if device.vid and device.pid]
-
-    possible_device = []
-    for device in device_list:
-        for vid_pid in set(DEVICES.values()):
-            if device.vid == vid_pid[0] and device.pid == vid_pid[1]:
-                possible_device.append(device)
-                break
-    if not possible_device:
-        raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
-    index = 0
-    if len(possible_device) > 1:
-        for i, device in enumerate(possible_device, 0):
-            info = ' {0:d}) {d.manufacturer:s} {d.description:s} (0x{d.vid:04X}, 0x{d.pid:04X})'.format(i, d = device)
-            print(info)
-        choose = input('\n Select: ')
-        index = int(choose, 10)
-    selected_device = possible_device[index]
-    product_name = '{d.manufacturer:s} {d.description:s}'.format(
-        d = selected_device).rsplit(' (', 1)[0]
-    port = selected_device.device  # port or (vid, pid)
-    return product_name, port
-
-def scan_spi():
-    value = set(FTDI.values())
-    devices = pyftdi.usbtools.UsbTools.find_all(value)
-    if not devices: # not use, UsbTools will throw an error
-        raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
-    index = 0
-    if len(devices) > 1:
-        for i, device in enumerate(devices, 0):
-            info = ' {0:d}) {d[-1]:s} ({d[1]:#04X}, {d[2]:#04X})'.format(i, d = device)
-            print(info)
-        c = input('\n Select: ')
-        index = int(c, 10)
-    *vid_pid, _, _, product_name = devices[index]
-    return product_name, tuple(vid_pid)
+from .peripheral import parse_peripheral
 
 def parse_args(parser, subparsers, command=None):
     if command is None:
@@ -187,8 +41,8 @@ def parse_args(parser, subparsers, command=None):
         parser._parse_known_args(list(argv), namespace=n)
     return args
 
-def info(kb, memory_id):
-    nfo = kb.get_mcu_info()
+def info(mb, memory_id):
+    nfo = mb.get_mcu_info()
     # Print KBoot MCU Info
     for key, value in nfo.items():
         m = " {}:".format(key)
@@ -198,38 +52,38 @@ def info(kb, memory_id):
             m += "\n  = {}".format(value)
         print(m)
     if memory_id:
-        info = kb.get_exmemory_info(memory_id)
+        info = mb.get_exmemory_info(memory_id)
         print(info)
 
-def write(kb, address, filename, memory_id=0, offset=0):
-    kb.get_memory_range()
+def write(mb, address, filename, memory_id=0, offset=0):
+    mb.get_memory_range()
     data, start_address = read_file(filename, address)
     length = len(data) - offset
     data = data[offset:]
     block = MemoryBlock(start_address, None, length)
     if memory_id:
         # Todo configure memory
-        kb.flash_erase_region(start_address, length, memory_id)
+        mb.flash_erase_region(start_address, length, memory_id)
     else:
-        if kb.is_in_flash(block):   # erase first if block in the flash area
-            kb.flash_erase_region(block.start, block.length)
-        elif kb.is_in_memory(block):
+        if mb.is_in_flash(block):   # erase first if block in the flash area
+            mb.flash_erase_region(block.start, block.length)
+        elif mb.is_in_memory(block):
             pass
         else:
             raise McuBootGenericError('MemoryRangeInvalid, please check the address range.')
-        start = kb.get_property(PropertyTag.RAM_START_ADDRESS)
-    kb.write_memory(start_address, data, memory_id)
+        start = mb.get_property(PropertyTag.RAM_START_ADDRESS)
+    mb.write_memory(start_address, data, memory_id)
 
-def read(kb, address, length, filename=None, memory_id=0, compress=False):
-    kb.get_memory_range()
+def read(mb, address, length, filename=None, memory_id=0, compress=False):
+    mb.get_memory_range()
     block = MemoryBlock(address, None, length)
     if memory_id:
         # Todo configure memory
         pass
     else:
-        if not (kb.is_in_flash(block) or kb.is_in_memory(block)):
+        if not (mb.is_in_flash(block) or mb.is_in_memory(block)):
             raise McuBootGenericError('MemoryRangeInvalid, please check the address range.')
-    data = kb.read_memory(address, length, filename, memory_id)
+    data = mb.read_memory(address, length, filename, memory_id)
     print('\n', hexdump(data, address, compress))
 
 # def handle_exception(func):
@@ -239,39 +93,39 @@ def read(kb, address, length, filename=None, memory_id=0, compress=False):
 #         except McuBootGenericError as e:
 #             err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
-def fill(kb, address, byte_count, pattern, unit):
-    kb.get_memory_range()
+def fill(mb, address, byte_count, pattern, unit):
+    mb.get_memory_range()
     block = MemoryBlock(address, None, byte_count*8)
-    if kb.is_in_flash(block):
-        kb.flash_erase_region(block.start, block.length)
-    elif kb.is_in_memory(block):
+    if mb.is_in_flash(block):
+        mb.flash_erase_region(block.start, block.length)
+    elif mb.is_in_memory(block):
         pass
     else:
         raise McuBootGenericError('MemoryRangeInvalid, please check the address range.')
-    kb.fill_memory(address, byte_count, pattern, unit)
+    mb.fill_memory(address, byte_count, pattern, unit)
 
-def erase(kb, address, length, memory_id=0, erase_all = False):
+def erase(mb, address, length, memory_id=0, erase_all = False):
     if erase_all:
         # Get available commands
-        commands = kb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)
+        commands = mb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)
         # Call KBoot flash erase all function
         if mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
-            kb.flash_erase_all_unsecure()
+            mb.flash_erase_all_unsecure()
         elif mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL, commands):
-            kb.flash_erase_all()
+            mb.flash_erase_all()
         else:
             raise McuBootGenericError('Not Supported "flash_erase_all_unsecure/flash_erase_all" Command')
     else:
         # Call KBoot flash erase region function
-        kb.flash_erase_region(address, length, memory_id)
+        mb.flash_erase_region(address, length, memory_id)
 
-def unlock(kb, key=None):
+def unlock(mb, key=None):
     if key is None:
         # Call KBoot flash erase all and unsecure function
-        kb.flash_erase_all_unsecure()
+        mb.flash_erase_all_unsecure()
     else:
         # Call KBoot flash security disable function
-        kb.flash_security_disable(key)
+        mb.flash_security_disable(key)
 
 class MBootHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     def __init__(self, prog, *args, **kwargs):
@@ -508,62 +362,64 @@ def main():
 
     # print(cmd)
 
-    kb = mboot.McuBoot()
+    mb = mboot.McuBoot()
+    mb.cli_mode = True  # this is cli mode
     if cmd.usb is not None:
-        port = parse_peripheral('usb', cmd.usb, scan_usb)[0]
-        device = RawHID.enumerate(*port)[0]
-        kb.open_usb(device)
+        vid_pid = parse_peripheral(Interface.USB.name, cmd.usb)[0]
+        mb.open_usb(vid_pid)
+        # device = RawHID.enumerate(*vid_pid)[0]
+        # mb.open_usb(device)
     elif cmd.uart is not None:
-        port, baudrate = parse_peripheral('uart', cmd.uart, scan_uart)
-        kb.open_uart(port, baudrate)
+        port, baudrate = parse_peripheral(Interface.UART.name, cmd.uart)
+        mb.open_uart(port, baudrate)
     elif cmd.spi is not None:
-        vid_pid, speed = parse_peripheral('spi', cmd.spi, scan_spi)
-        kb.open_spi(vid_pid, speed, 0)
+        vid_pid, speed = parse_peripheral(Interface.SPI.name, cmd.spi)
+        mb.open_spi(vid_pid, speed, 0)
     elif cmd.i2c is not None:
         pass
     else:
         raise McuBootGenericError('You need to choose a peripheral for communication.')
 
-    # kb.get_memory_range()
+    # mb.get_memory_range()
 
     if cmd.info:
-        info(kb, cmd.info.memory_id)
+        info(mb, cmd.info.memory_id)
 
     if cmd.write:
         args = cmd.write
-        write(kb, args.address, args.filename, args.memory_id, args.offset)
+        write(mb, args.address, args.filename, args.memory_id, args.offset)
         print(" Wrote Successfully.")
         # if check_method_arg_number(write, len(cmd.write)+1):
         #     args = convert_arg_to_int(cmd.write)
-        #     write(kb, *args)
+        #     write(mb, *args)
 
     if cmd.read:
         args = cmd.read
-        read(kb, args.address, args.length, args.filename, args.memory_id, args.compress)
+        read(mb, args.address, args.length, args.filename, args.memory_id, args.compress)
 
     if cmd.fill:
         args = cmd.fill
-        fill(kb, args.address, args.byte_count, args.pattern, args.unit)
+        fill(mb, args.address, args.byte_count, args.pattern, args.unit)
         print(" Filled Successfully.")
 
     if cmd.erase:
         args = cmd.erase
-        erase(kb, args.address, args.length, args.memory_id, args.all)
+        erase(mb, args.address, args.length, args.memory_id, args.all)
         print(" Erased Successfully.")
 
     if cmd.unlock:
         args = cmd.unlock
-        unlock(kb, args.key)
+        unlock(mb, args.key)
         print(" Unlocked Successfully.")
 
     if cmd.reset:
-        kb.reset()
+        mb.reset()
         print(' Reset OK')
 
     if cmd.origin:
-        kb.timeout = cmd.timeout or 5000
+        mb.timeout = cmd.timeout or 5000
         attr = cmd.origin[0].replace('-', '_')
-        func = getattr(kb, attr, None)
+        func = getattr(mb, attr, None)
 
         if func:
             cmd_args = cmd.origin[1:]
@@ -580,7 +436,7 @@ def main():
         else:
             raise McuBootGenericError('invalid command:{}'.format(cmd.origin[0]))
 
-    kb.close()
+    mb.close()
 
 if __name__ == "__main__":
     main()

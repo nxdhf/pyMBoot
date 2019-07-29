@@ -6,6 +6,7 @@
 
 from .enums import CommandTag, PropertyTag, StatusCode
 from .memorytool import MemoryBlock, Memory, Flash
+from .peripheral import parse_peripheral, scan_usb, scan_uart, scan_spi
 from .mboot import McuBoot, decode_property_value, is_command_available
 from .exception import McuBootGenericError, McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
 from .cli import main
@@ -24,6 +25,11 @@ __all__ = [
     'MemoryBlock',
     'Memory',
     'Flash',
+    # peripheral
+    'parse_peripheral',
+    'scan_usb',
+    'scan_uart',
+    'scan_spi',
     # classes
     'McuBoot',
     # enums
