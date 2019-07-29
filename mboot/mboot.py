@@ -418,16 +418,19 @@ class McuBoot(object):
         # Process SetProperty command
         self._itf_.write_cmd(cmd)
 
-    def receive_sb_file(self, data):
+    def receive_sb_file(self, filename):
         """ KBoot: Receive SB file
         CommandTag: 0x08
-        :param  data: SB file data
+        :param filename: SB file name or data
         """
+        if isinstance(filename, str):
+            with open(filename, 'rb') as f:
+                data = f.read()
         if len(data) == 0:
             raise ValueError('Data len is zero')
         logging.info('TX-CMD: Receive SB file [ len=%d ]', len(data))
         # Prepare WriteMemory command
-        cmd = struct.pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
+        cmd = struct.pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x01, 0x00, 0x01, len(data))
         # get max packet size
         max_packet_size = self.get_property(PropertyTag.MAX_PACKET_SIZE)
         # Process WriteMemory command
