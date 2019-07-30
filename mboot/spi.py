@@ -30,7 +30,7 @@ class SPI(UartProtocolMixin):
         """ close the interface """
         self.controller.terminate()
     
-    def read(self, packet_type, rx_ack=False, tx_ack=True):
+    def read(self, packet_type, rx_ack=False, tx_ack=True, locate=None):
         # data = self.slave.read(length).tobytes()
         # logging.debug('SPI-IN-%s-ORIGIN[%d]: %s', packet_type.name, len(data), atos(data))
         # start_index = data.find(0x5A)
@@ -66,18 +66,24 @@ class SPI(UartProtocolMixin):
                 raise EnvironmentError
         payload = self.slave.read(payload_len).tobytes()
 
-        logging.debug('SPI-IN-%s-PAYLOAD[%d]: %s', packet_type.name, len(payload), atos(payload))
+        if locate is None:
+            logging.debug('SPI-IN-%s-PAYLOAD[%d]: %s', packet_type.name, len(payload), atos(payload))
+        else:
+            logging.debug('SPI-IN-%s-PAYLOAD[%d][0x%X]: %s', packet_type.name, len(payload), locate, atos(payload))
 
         if tx_ack:
             self.send_ack()
 
         return head, payload
     
-    def write(self, packet_type, data, rx_ack=True):
+    def write(self, packet_type, data, rx_ack=True, locate=None):
         # data = self.protocol.genPacket(packet_type, payload)
         # self.ping()
         self.slave.write(data)  # The array 'data' will changed into a list during execution.
-        logging.debug('SPI-OUT-%s[%d]: %s', packet_type.name, len(data), atos(data))
+        if locate is None:
+            logging.debug('SPI-OUT-%s[%d]: %s', packet_type.name, len(data), atos(data))
+        else:
+            logging.debug('SPI-OUT-%s[%d][0x%X]: %s', packet_type.name, len(data), locate, atos(data))
         if rx_ack:
             self.receive_ack()
 

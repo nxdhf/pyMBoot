@@ -121,7 +121,7 @@ class UartProtocolMixin(ProtocolMixin):
         data = bytearray()
 
         while n < length:
-            head, pkg = self.read(FPType.DATA)
+            head, pkg = self.read(FPType.DATA, locate = n)
             _packet_type, crc = self.parse_framing(head)
             
             '''Slave interrupt in read data
@@ -167,7 +167,7 @@ class UartProtocolMixin(ProtocolMixin):
             try:
                 '''There may be a problem with the write, the slave aborts receiving the data, 
                 and the master aborts the write and receives the error message.'''
-                self.write(FPType.DATA, data_packet)
+                self.write(FPType.DATA, data_packet, locate = start)
             except McuBootDataError as e:
                 logging.error(e)
                 break
@@ -336,7 +336,7 @@ class UsbProtocolMixin(ProtocolMixin):
         while n < length:
             # Read USB-HID DATA IN Report
             try:
-                rep_id, rx_payload = self.read(timeout) # note: The length of rx_payload is not necessarily 32 bits
+                rep_id, rx_payload = self.read(timeout, locate = n) # note: The length of rx_payload is not necessarily 32 bits
             except:
                 logging.info('RX-DATA: USB Disconnected')
                 raise McuBootTimeOutError('USB Disconnected')
@@ -394,13 +394,13 @@ class UsbProtocolMixin(ProtocolMixin):
             raise McuBootConnectionError('Disconnected')
 
         while n > 0:
-            length = 0x20
+            length = max_packet_size
             if n < length:
                 length = n
             payload = data[start:start + length]
 
             # send USB-HID command OUT report
-            self.write(HID_REPORT['DATA_OUT'], payload)
+            self.write(HID_REPORT['DATA_OUT'], payload, locate = start)
 
             n -= length
             start += length

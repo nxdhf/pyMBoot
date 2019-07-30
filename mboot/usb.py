@@ -97,7 +97,7 @@ if os.name == "nt":
             logging.debug("Closing USB interface")
             self.device.close()
 
-        def write(self, id, data, size=None):
+        def write(self, id, data, size=None, locate=None):
             """
             write data on the OUT endpoint associated to the HID interface
 
@@ -106,10 +106,13 @@ if os.name == "nt":
                 size = self.report[id - 1]._HidReport__raw_report_size
 
             rawdata = self._encode_packet(id, data, size)
-            logging.debug('USB-OUT[%d]: %s', size, atos(rawdata))
+            if locate is None:
+                logging.debug('USB-OUT[%d]: %s', size, atos(rawdata))
+            else:
+                logging.debug('USB-OUT[%d][0x%X]: %s', size, locate, atos(rawdata))
             self.report[id - 1].send(rawdata)
 
-        def read(self, timeout=2000):
+        def read(self, timeout=2000, locate=None):
             """
             Read data on the IN endpoint associated to the HID interface
             :param timeout:
@@ -119,7 +122,10 @@ if os.name == "nt":
                 if ((time() - start) * 1000) > timeout:
                     raise Exception("Read timed out")
             rawdata = self.rcv_data.popleft()
-            logging.debug('USB-IN [%d]: %s', len(rawdata), atos(rawdata))
+            if locate is None:
+                logging.debug('USB-IN[%d]: %s', len(rawdata), atos(rawdata))
+            else:
+                logging.debug('USB-IN[%d][0x%X]: %s', len(rawdata), locate, atos(rawdata))
             return self._decode_packet(bytes(rawdata))
             # return bytes(rawdata)
 
@@ -202,12 +208,15 @@ else:
             except:
                 pass
 
-        def write(self, id, data, size=36):
+        def write(self, id, data, size=36, locate=None):
             """
             write data on the OUT endpoint associated to the HID interface
             """
             rawdata = self._encode_packet(id, data, size)
-            logging.debug('USB-OUT[0x]: %s', atos(rawdata))
+            if locate is None:
+                logging.debug('USB-OUT[%d]: %s', size, atos(rawdata))
+            else:
+                logging.debug('USB-OUT[%d][0x%X]: %s', size, locate, atos(rawdata))
 
             if self.ep_out:
                 self.ep_out.write(rawdata)
@@ -218,13 +227,17 @@ else:
                 wIndex = self.intf_number  #Interface number for HID
                 self.dev.ctrl_transfer(bmRequestType, bmRequest, wValue + id, wIndex, rawdata)
 
-        def read(self, timeout=1000):
+        def read(self, timeout=1000, locate=None):
             """
             read data on the IN endpoint associated to the HID interface
             """
             #rawdata = self.ep_in.read(self.ep_in.wMaxPacketSize, timeout)
             rawdata = self.ep_in.read(36, timeout)
-            logging.debug('USB-IN [0x]: %s', atos(rawdata))
+            if locate is None:
+                logging.debug('USB-IN[%d]: %s', len(rawdata), atos(rawdata))
+            else:
+                logging.debug('USB-IN[%d][0x%X]: %s', len(rawdata), locate, atos(rawdata))
+            # logging.debug('USB-IN [0x]: %s', atos(rawdata))
             return self._decode_packet(rawdata)
 
         @staticmethod
