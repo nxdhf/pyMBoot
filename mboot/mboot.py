@@ -509,8 +509,20 @@ class McuBoot(object):
         #         self._itf_.close()
                 
         #         self._itf_.open()
-        time.sleep(0.005)   # Wait 5 ms for the device to complete reset
-                
+        if self.cli_mode == False:
+            '''
+            SPI-1M:     0.005s
+            uart-57600: 0.01s
+            uart-115200:0.009s
+            '''
+            if self.current_interface == Interface.USB:
+                self.close()
+                time.sleep(0.4)
+                self.open_usb(self.reopen_args)
+            elif self.current_interface == Interface.UART:
+                time.sleep(0.01)    # Wait 10 ms for the device to complete reset
+            elif self.current_interface == Interface.SPI:
+                time.sleep(0.005)   # Wait 5 ms for the device to complete reset
 
     def flash_erase_all_unsecure(self):
         """ MCUBoot: Erase complete flash memory and recover flash security section
