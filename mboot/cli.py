@@ -376,7 +376,8 @@ def main():
         vid_pid, speed = parse_peripheral(Interface.SPI.name, cmd.spi)
         mb.open_spi(vid_pid, speed, 0)
     elif cmd.i2c is not None:
-        pass
+        vid_pid, speed = parse_peripheral(Interface.I2C.name, cmd.i2c)
+        mb.open_i2c(vid_pid, speed)
     else:
         raise McuBootGenericError('You need to choose a peripheral for communication.')
 

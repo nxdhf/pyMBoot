@@ -38,7 +38,7 @@ FTDI = {
 peripheral_speed = {
     'usb'   : 12000000,
     'uart'  : 57600,
-    'i2c'   : 400,
+    'i2c'   : 100000,
     'spi'   : 1000000,
     'can'   : 500
 }
@@ -90,7 +90,7 @@ def parse_peripheral(peripheral, args):
             product_name, port = scan_func()
 
     if isinstance(port, str):
-        info = ' DEVICE: {0:s} ({1:s})'.format(product_name, port)
+        info = ' DEVICE: {0:s} ({1:s}) {2:d}'.format(product_name, port, speed)
     else:   # tuple or list
         info = ' DEVICE: {0:s} (0x{p[0]:04X}, 0x{p[1]:04X}) {1:d}'.format(product_name, speed, p=port)
     print(info)
@@ -154,3 +154,5 @@ def scan_spi():
         index = int(c, 10)
     *vid_pid, _, _, product_name = devices[index]
     return product_name, tuple(vid_pid)
+
+scan_i2c = scan_spi

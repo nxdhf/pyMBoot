@@ -19,6 +19,7 @@ from .exception import McuBootGenericError, McuBootCommandError
 from .uart import UART
 from .usb import RawHID
 from .spi import SPI
+from .i2c import I2C
 from .memorytool import MemoryBlock, Memory, Flash
 from .peripheral import parse_port
 
@@ -230,6 +231,26 @@ class McuBoot(object):
         else:
             self.current_interface = Interface.SPI
             self.reopen_args = (_vid_pid, freq, mode)
+            return True
+
+    def open_i2c(self, vid_pid, freq):
+        """ MCUBoot: Connect by UART
+        """
+        if isinstance(vid_pid, str):
+            _vid_pid = parse_port(Interface.I2C.name, vid_pid)
+        else:   # Default input tuple in cli mode, no conversion required
+            _vid_pid = vid_pid
+        try:
+            self._itf_ = I2C(freq)
+            self._itf_.open(*_vid_pid)
+        except Exception:
+            logging.info('Open I2C failed, I2C disconnected !')
+            if self.cli_mode:   # Fast failure in cli mode
+                raise
+            return False
+        else:
+            self.current_interface = Interface.I2C
+            self.reopen_args = (_vid_pid, freq)
             return True
 
     def close(self):
@@ -511,9 +532,10 @@ class McuBoot(object):
         #         self._itf_.open()
         if self.cli_mode == False:
             '''
-            SPI-1M:     0.005s
             uart-57600: 0.01s
             uart-115200:0.009s
+            SPI-1M:     0.005s
+            I2C-100K:   No need to wait
             '''
             if self.current_interface == Interface.USB:
                 self.close()
@@ -523,6 +545,8 @@ class McuBoot(object):
                 time.sleep(0.01)    # Wait 10 ms for the device to complete reset
             elif self.current_interface == Interface.SPI:
                 time.sleep(0.005)   # Wait 5 ms for the device to complete reset
+            # elif self.current_interface == Interface.I2C:
+            #     time.sleep(0.001)   # Wait 5 ms for the device to complete reset
 
     def flash_erase_all_unsecure(self):
         """ MCUBoot: Erase complete flash memory and recover flash security section
