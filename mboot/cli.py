@@ -364,6 +364,17 @@ def main():
 
     mb = mboot.McuBoot()
     mb.cli_mode = True  # this is cli mode
+
+    # Added the feature to display the original interface help
+    if cmd.origin and ('-h' in cmd.origin or '--help' in cmd.origin):
+        attr = cmd.origin[0].replace('-', '_')
+        func = getattr(mb, attr, None)
+        if func:
+            print('\n  '.join(line.strip() for line in func.__doc__.split('\n ')))
+            sys.exit(0) # Normal exit
+        else:
+            raise McuBootGenericError('invalid command:{}'.format(cmd.origin[0]))
+
     if cmd.usb is not None:
         vid_pid = parse_peripheral(Interface.USB.name, cmd.usb)[0]
         mb.open_usb(vid_pid)
