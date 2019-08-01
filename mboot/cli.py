@@ -3,11 +3,12 @@ import argparse
 import mboot
 
 import logging
-from .tool import check_method_arg_number, convert_arg_to_int, check_key, check_int, hexdump, read_file
+from .tool import check_method_arg_number, convert_arg_to_int, check_key, check_int, hexdump
 from .enums import PropertyTag
 from .constant import Interface
 from .memorytool import MemoryBlock
 from .peripheral import parse_peripheral
+from .exception import McuBootGenericError
 
 def parse_args(parser, subparsers, command=None):
     if command is None:
@@ -289,6 +290,7 @@ class FixArgValue(argparse.Action):
                         setattr(namespace, self.check_arg, item.default)
                         break
 
+@mboot.global_error_handler
 def main():
     parser = argparse.ArgumentParser(prog='mboot', description='A python mboot with user interface.', 
         formatter_class=MBootHelpFormatter, add_help=False)#, usage='%(prog)s [peripheral option] [other options] []')
@@ -435,6 +437,8 @@ def main():
 
         if func:
             cmd_args = cmd.origin[1:]
+            # if cmd_args[0].lower().startswith('-h'):    # cmd_args[0].lower() == '-h' or cmd_args[0].lower() == '--help':
+            #     print('\n  '.join(line.strip() for line in func.__doc__.split('\n ')))
             if check_method_arg_number(func, len(cmd_args)):
                 if attr == 'flash_security_disable':
                     args = cmd_args
