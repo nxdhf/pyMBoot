@@ -82,7 +82,7 @@ class UartProtocolMixin(ProtocolMixin):
                 raise McuBootCommandError(errval=status)
         return value
 
-    def write_cmd(self, payload, timeout=1000, status_success=StatusCode.SUCCESS, **kwargs):
+    def write_cmd(self, payload, timeout=1, status_success=StatusCode.SUCCESS, **kwargs):
         '''Send the cmd packet
         :param bytes payload: payload in the current packet
 
@@ -93,7 +93,7 @@ class UartProtocolMixin(ProtocolMixin):
         # log TX raw command data
         logging.debug('TX-CMD [%02d]: %s', len(data), atos(data))
 
-        self.write(FPType.CMD, data)
+        self.write(FPType.CMD, data, timeout = timeout)
         try:
             head, rxpkg = self.read(FPType.CMD, **kwargs)
         except:
@@ -116,7 +116,7 @@ class UartProtocolMixin(ProtocolMixin):
                 raise McuBootCommandError(errval=status)
         return value
 
-    def read_data(self, length, timeout=1000):
+    def read_data(self, length):
         n = 0
         data = bytearray()
 
@@ -296,6 +296,10 @@ class UsbProtocolMixin(ProtocolMixin):
             logging.info('RX-DATA: Disconnected')
             raise McuBootConnectionError('Disconnected')
 
+        # Unit conversion: s -> ms
+        timeout = timeout * 1000 if timeout < 1000 else timeout
+        # print(timeout)
+
         # Send USB-HID CMD OUT Report
         self.write(HID_REPORT['CMD_OUT'], payload)
 
@@ -324,6 +328,9 @@ class UsbProtocolMixin(ProtocolMixin):
         return value
 
     def read_data(self, length, timeout=1000):
+        # Unit conversion: s -> ms
+        timeout = timeout * 1000 if timeout < 1000 else timeout
+
         n = 0
         data = bytearray()
         pg_dt = float(self._pg_end - self._pg_start) / length

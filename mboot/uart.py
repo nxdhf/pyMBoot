@@ -6,17 +6,16 @@
 
 # import sys
 # import glob
+import time
 import logging
 import serial
 # from time import time
 from struct import pack, unpack
 from .misc import atos
 from .protocol import FPType, UartProtocolMixin
-from .exception import McuBootDataError
+from .exception import McuBootDataError, McuBootTimeOutError
 from .enums import StatusCode
 # from .misc import crc16
-# McuBootConnectionError
-
 
 ########################################################################################################################
 # UART Interface Class
@@ -99,11 +98,11 @@ class UART(UartProtocolMixin):
             logging.debug('UART-IN-%s-PAYLOAD[%d][0x%X]: %s', packet_type.name, len(payload), locate, atos(payload))
 
         if tx_ack:
-            self.send_ack()
+            self._send_ack()
 
         return head, payload
 
-    def write(self, packet_type, data, rx_ack=True, locate=None):
+    def write(self, packet_type, data, rx_ack=True, timeout=1, locate=None):
         # data = self.protocol.genPacket(packet_type, payload)
         # self.ping()
         self.ser.write(data)  # The array 'data' will changed into a list during execution.
@@ -113,7 +112,7 @@ class UART(UartProtocolMixin):
             logging.debug('UART-OUT-%s[%d][0x%X]: %s', packet_type.name, len(data), locate, atos(data))
         
         if rx_ack:
-            self.receive_ack()
+            self._receive_ack(timeout)
 
     def ping(self):
         ping = bytes(b'\x5A\xA6')
@@ -139,32 +138,38 @@ class UART(UartProtocolMixin):
                 raise EnvironmentError
         return data
 
-    def find_start_byte(self, timeout=5000):
+    def find_start_byte(self, timeout=1):
         '''find start byte (0x5A) of the packet
         :param timeout: timeout
         :return array of start byte
         '''
-        # Todo: add timeout logic
-        while 1:
-            start = self.ser.read(1)
-            if start[0] == 0x5A:
-                break
-        return start
+        # logging.debug('current timeout: {}'.format(timeout))
+        # timeout logic
+        start_time = time.perf_counter()
 
-    def send_ack(self):
+        # Return before time runs out
+        while time.perf_counter() - start_time < timeout:
+            start = self.ser.read(1)    # return bytes
+            # logging.debug('{!r} {}'.format(start, type(start)))
+            if start == b'\x5A':
+                return start
+        raise McuBootTimeOutError
+        
+
+    def _send_ack(self):
         '''Used to send ack after read phase
         '''
         ack = bytes(b'\x5A\xA1')
         self.ser.write(ack)
         logging.debug('UART-OUT-ACK[%d]: %s', len(ack), atos(ack))
 
-    def receive_ack(self):
+    def _receive_ack(self, timeout):
         '''Used to receive ack after write phase
         '''
         # data = self.ser.read(0x50)
         # logging.debug('UART-IN-ORIGIN++[%d]: %s', len(data), atos(data))
         # start_index = data.find(0x5A)
-        self.find_start_byte()
+        self.find_start_byte(timeout)
         packet_type = self.ser.read(1)[0]
         if not packet_type == FPType.ACK:
             if packet_type == FPType.ABORT:
@@ -225,11 +230,11 @@ class UART(UartProtocolMixin):
     #             #self.ser.setTimeout(1)
     #             self.ser.flushInput()
     #             self.ser.flushOutput()
-    #             self.send_ack(False)
+    #             self._send_ack(False)
     #             repeat_count -= 1
     #             continue
     #         else:
-    #             self.send_ack()
+    #             self._send_ack()
     #             return (packet_type, data[2:])
     #     raise Exception("CRC Error")
 

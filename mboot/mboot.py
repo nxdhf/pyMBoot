@@ -135,7 +135,7 @@ class McuBoot(object):
         self._itf_ = None
         self.current_interface = None
         self.reopen_args = None
-        self.timeout = None or 5000
+        self.timeout = 1
         self._usb_dev = None
         self._uart_dev = None
         self._spi_dev = None
@@ -316,9 +316,10 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashEraseAll [ memoryId = 0x%X ]', memory_id)
         # Prepare FlashEraseAll command
-        cmd = struct.pack('4BI', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00, memory_id)
+        cmd = struct.pack('4BI', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x01, memory_id)
         # Process FlashEraseAll command
-        self._itf_.write_cmd(cmd)
+        timeout = 300 if self.timeout == 1 else self.timeout
+        self._itf_.write_cmd(cmd, timeout = timeout)
 
     def flash_erase_region(self, start_address, length, memory_id = 0):
         """ MCUBoot: Erase specified range of flash
@@ -329,9 +330,10 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=0x%X | memoryId = 0x%X ]', start_address, length, memory_id)
         # Prepare FlashEraseRegion command
-        cmd = struct.pack('<4B3I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length, memory_id)
+        cmd = struct.pack('<4B3I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x03, start_address, length, memory_id)
         # Process FlashEraseRegion command
-        self._itf_.write_cmd(cmd, self.timeout)
+        timeout = 300 if self.timeout == 1 else self.timeout
+        self._itf_.write_cmd(cmd, timeout = timeout)
 
     def read_memory(self, start_address, length, filename = None, memory_id = 0):
         """ MCUBoot: Read data from MCU memory
@@ -556,7 +558,8 @@ class McuBoot(object):
         # Prepare FlashEraseAllUnsecure command
         cmd = struct.pack('4B', CommandTag.FLASH_ERASE_ALL_UNSECURE, 0x00, 0x00, 0x00)
         # Process FlashEraseAllUnsecure command
-        self._itf_.write_cmd(cmd)
+        timeout = 300 if self.timeout == 1 else self.timeout
+        self._itf_.write_cmd(cmd, timeout = timeout)
 
     def flash_read_once(self, index, byte_count):
         """ MCUBoot: Read from MCU flash program once region (max 8 bytes)

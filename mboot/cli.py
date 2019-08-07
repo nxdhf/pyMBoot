@@ -3,7 +3,7 @@ import argparse
 import mboot
 
 import logging
-from .tool import check_method_arg_number, convert_arg_to_int, check_key, check_int, hexdump
+from .tool import check_method_arg_number, convert_arg_to_int, check_key, check_int, hexdump, read_file
 from .enums import PropertyTag
 from .constant import Interface
 from .memorytool import MemoryBlock
@@ -44,7 +44,7 @@ def parse_args(parser, subparsers, command=None):
 
 def info(mb, memory_id):
     nfo = mb.get_mcu_info()
-    # Print KBoot MCU Info
+    # Print MCUBoot MCU Info
     for key, value in nfo.items():
         m = " {}:".format(key)
         if isinstance(value, list):
@@ -302,7 +302,9 @@ def main():
         'such as "-s VIDPID SPEED", "-s VIDPID", "-s SPEED", "-s"', metavar=('vid,pid', 'speed'))
     group.add_argument('-i', '--i2c', nargs='*', help='Use i2c peripheral', metavar=('vid,pid', 'speed'))
 
-    parser.add_argument('-t', '--timeout', type=int, help='Maximum wait time for performing a single atomic operation')
+    parser.add_argument('-t', '--timeout', type=int, help='Maximum wait time for the change of the transceiver status in a single atomic operation, '
+        'it is only valid for the "flash-erase-*" command and only changes the timeout of the ack after sending the packet, '
+        'which is invalid for the timeout in read phase.')
     # parser.add_argument('-d', '--debug', action='store_true', help='Debug level: 0-off, 1-info, 2-debug')
     parser.add_argument('-d', '--debug', nargs='?', type=int, choices=range(0, 3), const=1, default=0, help='Debug level: 0-off, 1-info, 2-debug')
     parser.add_argument('-o', '--origin', nargs=argparse.REMAINDER, help='MCU Boot Original Interface')
@@ -431,7 +433,7 @@ def main():
         print(' Reset OK')
 
     if cmd.origin:
-        mb.timeout = cmd.timeout or 5000
+        mb.timeout = cmd.timeout or mb.timeout
         attr = cmd.origin[0].replace('-', '_')
         func = getattr(mb, attr, None)
 

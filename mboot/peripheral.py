@@ -37,9 +37,9 @@ FTDI = {
 
 peripheral_speed = {
     'usb'   : 12000000,
-    'uart'  : 57600,
+    'uart'  : 57600,    # Minimum baud rate 1200
     'i2c'   : 100000,
-    'spi'   : 1000000,
+    'spi'   : 1000000,  # The minimum speed is about 3000, otherwise the underlying pyftdi will report an error.
     'can'   : 500
 }
 
