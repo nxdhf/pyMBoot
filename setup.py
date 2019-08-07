@@ -41,10 +41,10 @@ setup(
         'click==7.0',
         'pyserial==3.4',
         'bincopy==16.0.0',
-        'easy_enum>=0.1.1',
-        'pyusb>=1.0.0b2;platform_system!="Windows"',
-        'pywinusb>=0.4.2;platform_system=="Windows"',
-        'pyftdi'
+        'easy_enum==0.2.0',
+        'pyusb==1.0.0;platform_system!="Windows"',
+        'pywinusb==0.4.2;platform_system=="Windows"',
+        'pyftdi==0.29.4'
     ],
     classifiers=[
         'Programming Language :: Python :: 3',
