@@ -29,6 +29,7 @@ class I2C(UartProtocolMixin):
     def close():
         """ close the interface """
         self.controller.terminate()
+        logging.debug("Close I2C Interface")
     
     def read(self, packet_type, rx_ack=False, tx_ack=True, locate=None):
         start_byte = self.find_start_byte()

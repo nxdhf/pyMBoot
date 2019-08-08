@@ -50,6 +50,7 @@ class UART(UartProtocolMixin):
     #     return result
 
     def open(self, port, baudrate=57600):
+        """ open the interface """
         self.ser.port = port
         self.ser.baudrate = baudrate
         self.ser.bytesize = serial.EIGHTBITS     # number of bits per bytes
@@ -67,8 +68,10 @@ class UART(UartProtocolMixin):
             print("error open serial port: " + str(e))
 
     def close(self):
+        """ close the interface """
         if self.ser.isOpen():
             self.ser.close()
+        logging.debug("Close UART Interface")
 
     def get_supported_baudrates(self):
         if self.ser.isOpen():

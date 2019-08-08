@@ -30,6 +30,7 @@ class SPI(UartProtocolMixin):
     def close():
         """ close the interface """
         self.controller.terminate()
+        logging.debug("Close SPI Interface")
 
     def read(self, packet_type, rx_ack=False, tx_ack=True, locate=None):
         # data = self.slave.read(length).tobytes()

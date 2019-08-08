@@ -136,13 +136,12 @@ class McuBoot(object):
         self.current_interface = None
         self.reopen_args = None
         self.timeout = 1
-        self._usb_dev = None
-        self._uart_dev = None
-        self._spi_dev = None
-        self._pg_func = None
-        self._pg_start = 0
-        self._pg_end = 100
-        self._abort = False
+        self.memory = None
+        self.flash = None
+        # self._pg_func = None
+        # self._pg_start = 0
+        # self._pg_end = 100
+        # self._abort = False
 
     # @staticmethod
     # def _parse_status(data):
@@ -152,18 +151,17 @@ class McuBoot(object):
     # def _parse_value(data):
     #     return unpack_from('<I', data, 8)[0]
 
-    def set_handler(self, progressbar, start_val=0, end_val=100):
-        self._pg_func = progressbar
-        self._pg_start = start_val
-        self._pg_end = end_val
-
-    def abort(self):
-        self._abort = True
+    # def set_handler(self, progressbar, start_val=0, end_val=100):
+    #     self._pg_func = progressbar
+    #     self._pg_start = start_val
+    #     self._pg_end = end_val
+    # def abort(self):
+    #     self._abort = True
 
     def is_open(self):
         """ MCUBoot: Check if device connected
         """
-        if self._usb_dev is not None:
+        if self._itf_ is not None:
             return True
         else:
             return False
@@ -256,29 +254,32 @@ class McuBoot(object):
     def close(self):
         """ MCUBoot: Disconnect device
         """
-        if self._usb_dev:
-            self._usb_dev.close()
-            self._usb_dev = None
-        elif self._uart_dev:
-            self._uart_dev.close()
-            self._uart_dev = None
+        if self._itf_:
+            self._itf_.close()
+            self._itf_ = None
+            # can't reopen
+            # self.current_interface = None
+            # self.reopen_args = None
+            return True
         else:
-            return
+            return False
     
     def get_memory_range(self):
-        mstart = self.get_property(PropertyTag.RAM_START_ADDRESS)
-        mlength = self.get_property(PropertyTag.RAM_SIZE)
-        self.memory = Memory(mstart, None, mlength)
-        # No on-chip flash situation
-        fstart = self.get_property(PropertyTag.FLASH_START_ADDRESS)
-        flength = self.get_property(PropertyTag.FLASH_SIZE)
-        self.flash = Flash(fstart, None, flength)
+        try:
+            mstart = self.get_property(PropertyTag.RAM_START_ADDRESS)
+            mlength = self.get_property(PropertyTag.RAM_SIZE)
+            self.memory = Memory(mstart, None, mlength)
+            fstart = self.get_property(PropertyTag.FLASH_START_ADDRESS)
+            flength = self.get_property(PropertyTag.FLASH_SIZE)
+            self.flash = Flash(fstart, None, flength)
+        except McuBootCommandError:
+            pass    # Some device have no internal memory.
 
     def is_in_memory(self, block):
-        return block in self.memory
+        return block in self.memory if self.memory else True
 
     def is_in_flash(self, block):
-        return block in self.flash
+        return block in self.flash if self.flash else True
 
     def get_mcu_info(self):
         """ MCUBoot: Get MCU info (available properties collection)
@@ -540,7 +541,7 @@ class McuBoot(object):
             I2C-100K:   No need to wait
             '''
             if self.current_interface == Interface.USB:
-                self.close()
+                self._itf_.close()
                 time.sleep(0.4)
                 self.open_usb(self.reopen_args)
             elif self.current_interface == Interface.UART:
