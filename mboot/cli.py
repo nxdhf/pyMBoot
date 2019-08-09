@@ -1,5 +1,6 @@
 import sys
 import argparse
+import re as _re
 import mboot
 
 import logging
@@ -9,6 +10,10 @@ from .constant import Interface
 from .memorytool import MemoryBlock
 from .peripheral import parse_peripheral
 from .exception import McuBootGenericError
+
+# Use when debugging the argprase library, because the command has not been received 
+# at this time to set the log level, so there will be no more detailed details.
+# logging.basicConfig(level=logging.DEBUG)
 
 def parse_args(parser, subparsers, command=None):
     if command is None:
@@ -130,7 +135,7 @@ def unlock(mb, key=None):
 
 class MBootHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     def __init__(self, prog, *args, **kwargs):
-        super(MBootHelpFormatter, self).__init__(prog, max_help_position=35, *args, **kwargs)
+        super(MBootHelpFormatter, self).__init__(prog, max_help_position=35, width=85, *args, **kwargs)
 
     def add_usage(self, usage, actions, groups, prefix=None):
         if prefix is None:
@@ -146,7 +151,9 @@ class MBootHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
             result = '[%s]' % get_metavar(1)
         elif action.nargs == argparse.ZERO_OR_MORE:
             if action.metavar is None:
-                result = '[%s [%s ...]]' % get_metavar(2)
+                # result = '[%s [%s ...]]' % get_metavar(2)
+                # When metavar is not set, use '...' for usage
+                result = '...'
             else:
                 if isinstance(action.metavar, str):
                     metavar_len = 1
@@ -162,6 +169,7 @@ class MBootHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
                     raise ValueError('The "metavar" attribute cannot provide an empty tuple.')
         elif action.nargs == argparse.ONE_OR_MORE:
             if action.metavar is None:
+                # When metavar is not set, use default value for usage
                 result = '[%s [%s ...]]' % get_metavar(2)
             else:
                 if isinstance(action.metavar, str):
@@ -212,7 +220,103 @@ class MBootHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
             return ', '.join(parts)
 
+class MBootSubHelpFormatter(MBootHelpFormatter):
+    def _format_usage(self, usage, actions, groups, prefix):
+        if prefix is None:
+            prefix = _('usage: ')
 
+        # if usage is specified, use that
+        if usage is not None:
+            usage = usage % dict(prog=self._prog)
+
+        # if no optionals or positionals are available, usage is just prog
+        elif usage is None and not actions:
+            usage = '%(prog)s' % dict(prog=self._prog)
+
+        # if optionals and positionals are available, calculate usage
+        elif usage is None:
+            prog = '%(prog)s' % dict(prog=self._prog)
+
+            # split optionals from positionals
+            optionals = []
+            positionals = []
+            for action in actions:
+                if action.option_strings:
+                    optionals.append(action)
+                else:
+                    positionals.append(action)
+
+            # build full usage string
+            format = self._format_actions_usage
+            # action_usage = format(optionals + positionals, groups)
+            # usage = ' '.join([s for s in [prog, action_usage] if s])
+
+            # break usage into wrappable parts
+            part_regexp = (
+                r'\(.*?\)+(?=\s|$)|'
+                r'\[.*?\]+(?=\s|$)|'
+                r'\S+'
+            )
+            opt_usage = format(optionals, groups)
+            pos_usage = format(positionals, groups)
+            opt_parts = _re.findall(part_regexp, opt_usage)
+            pos_parts = _re.findall(part_regexp, pos_usage)
+            assert ' '.join(opt_parts) == opt_usage
+            assert ' '.join(pos_parts) == pos_usage
+            usage = ' '.join([v for v in [prog, pos_usage, opt_usage] if v])
+
+            # wrap the usage parts if it's too long
+            text_width = self._width - self._current_indent
+            if len(prefix) + len(usage) > text_width:
+                # helper for wrapping lines
+                def get_lines(parts, indent, prefix=None):
+                    lines = []
+                    line = []
+                    if prefix is not None:
+                        line_len = len(prefix) - 1
+                    else:
+                        line_len = len(indent) - 1
+                    for part in parts:
+                        if line_len + 1 + len(part) > text_width and line:
+                            lines.append(indent + ' '.join(line))
+                            line = []
+                            line_len = len(indent) - 1
+                        line.append(part)
+                        line_len += len(part) + 1
+                    if line:
+                        lines.append(indent + ' '.join(line))
+                    if prefix is not None:
+                        lines[0] = lines[0][len(indent):]
+                    return lines
+
+                # if prog is short, follow it with optionals or positionals
+                if len(prefix) + len(prog) <= 0.75 * text_width:
+                    indent = ' ' * (len(prefix) + len(prog) + 1)
+                    if pos_parts and opt_parts:
+                        lines = get_lines([prog] + pos_parts, indent, prefix)
+                        lines.extend(get_lines(opt_parts, indent))
+                    elif opt_parts:
+                        lines = get_lines(opt_parts, indent, prefix)
+                    elif pos_parts:
+                        lines = get_lines(pos_parts, indent, prefix)
+                    else:
+                        lines = [prog]
+
+                # if prog is long, put it on its own line
+                else:
+                    indent = ' ' * len(prefix)
+                    parts = pos_parts + opt_parts
+                    lines = get_lines(parts, indent)
+                    if len(lines) > 1:
+                        lines = []
+                        lines.extend(get_lines(pos_parts, indent))
+                        lines.extend(get_lines(opt_parts, indent))
+                    lines = [prog] + lines
+                # join lines into usage
+                usage = '\n'.join(lines)
+
+        # prefix with 'usage:'
+        return '%s%s\n\n' % (prefix, usage)
 
 class FixArgValue(argparse.Action):
     """Fix incorrect allocation of values ​​due to resolution reasons
@@ -315,12 +419,12 @@ def main():
 
     subparsers = parser.add_subparsers(title='MCU Boot User Interface', prog='mboot [options]')
     
-    parser_info = subparsers.add_parser('info', help='Get MCU info (mboot properties)', add_help=False)
+    parser_info = subparsers.add_parser('info', help='Get MCU info (mboot properties)', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_info.add_argument('memory_id', nargs='?', type=check_int, default=0, 
         help='External memory id, Display external memory information if it is already executed configure-memory')
     parser_info.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
-    parser_write = subparsers.add_parser('write', help='Write data into MCU memory', add_help=False)
+    parser_write = subparsers.add_parser('write', help='Write data into MCU memory', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_write.add_argument('address', type=check_int, nargs='?', help='Start address, '
         'the arg can be omitted if file end with ".srec", ".s19", ".hex", ".ihex" that contains the address')
     parser_write.add_argument('filename', help='File to be written')
@@ -328,7 +432,7 @@ def main():
     parser_write.add_argument('-o', '--offset', type=check_int, default=0, help='Offset address')
     parser_write.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
-    parser_read = subparsers.add_parser('read', help='Read data from MCU memory', add_help=False)
+    parser_read = subparsers.add_parser('read', help='Read data from MCU memory', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_read.add_argument('address', type=check_int, help='Start address')
     parser_read.add_argument('length', type=check_int, default=0x100, help='Read data length')
     parser_read.add_argument('filename', nargs='?', help='File to be written')
@@ -336,7 +440,7 @@ def main():
     parser_read.add_argument('-c', '--compress', action='store_true', help='Compress dump output.')
     parser_read.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
-    parser_fill = subparsers.add_parser('fill', help='Fill MCU memory with specified pattern', add_help=False)
+    parser_fill = subparsers.add_parser('fill', help='Fill MCU memory with specified pattern', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_fill.add_argument('address', type=check_int, help='Start address')
     parser_fill.add_argument('byte_count', type=check_int, help='Total length of padding, count of bytes')
     parser_fill.add_argument('pattern', type=check_int, help='The pattern used for padding, (default: 0xFFFFFFFF)')
@@ -344,18 +448,18 @@ def main():
         help='Process pattern according to word, short(half-word), byte')
     parser_fill.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
-    parser_erase = subparsers.add_parser('erase', help='Erase MCU memory', add_help=False)
+    parser_erase = subparsers.add_parser('erase', help='Erase MCU memory', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_erase.add_argument('address', type=check_int, help='Start address')
     parser_erase.add_argument('length', type=check_int, default=0x100, help='Erase data length')
     parser_erase.add_argument('memory_id', nargs='?', type=check_int, default=0, help='External memory id')
     parser_erase.add_argument('-a', '--all', action='store_true', help='Erase complete MCU memory')
     parser_erase.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
-    parser_unlock = subparsers.add_parser('unlock', help='Unlock MCU', add_help=False)
+    parser_unlock = subparsers.add_parser('unlock', help='Unlock MCU', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_unlock.add_argument('-k', '--key', type=check_key, help='Use backdoor key as ASCI = S:123...8 or HEX = X:010203...08')
     parser_unlock.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
-    parser_reset = subparsers.add_parser('reset', help='Reset MCU', add_help=False)
+    parser_reset = subparsers.add_parser('reset', help='Reset MCU', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_reset.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
     cmd = parse_args(parser, subparsers)
