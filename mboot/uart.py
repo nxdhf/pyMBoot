@@ -7,10 +7,11 @@
 # import sys
 # import glob
 import time
+import struct
 import logging
+
 import serial
-# from time import time
-from struct import pack, unpack
+
 from .misc import atos
 from .protocol import FPType, UartProtocolMixin
 from .exception import McuBootDataError, McuBootTimeOutError
@@ -86,8 +87,8 @@ class UART(UartProtocolMixin):
                 raise EnvironmentError
             self.find_start_byte()
         head = start_byte + self.ser.read(5)
-        _, _packet_type, payload_len, crc = unpack('<2B2H', head) # framing packet
         logging.debug('UART-IN-%s-HEAD[%d]: %s', packet_type.name, len(head), atos(head))
+        _, _packet_type, payload_len, crc = struct.unpack('<2B2H', head) # framing packet
         if not _packet_type == packet_type:
             if _packet_type == FPType.CMD:   # ser interrupt in read data
                 pass    # Read out the rest of the command
@@ -136,7 +137,7 @@ class UART(UartProtocolMixin):
         start_byte = self.find_start_byte()
         data = start_byte + self.ser.read(9)
         logging.debug('UART-OUT-PINGR[%d]: %s', len(data), atos(data))
-        _, packet_type, *protocol_version, protocol_name, options, crc = unpack('<6B2H', data)
+        _, packet_type, *protocol_version, protocol_name, options, crc = struct.unpack('<6B2H', data)
         if not packet_type == FPType.PINGR:
                 raise EnvironmentError
         return data
@@ -154,7 +155,7 @@ class UART(UartProtocolMixin):
         while time.perf_counter() - start_time < timeout:
             start = self.ser.read(1)    # return bytes
             # logging.debug('{!r} {}'.format(start, type(start)))
-            if start == b'\x5A':
+            if start[0] == 0x5A:
                 return start
         raise McuBootTimeOutError
         
@@ -172,16 +173,17 @@ class UART(UartProtocolMixin):
         # data = self.ser.read(0x50)
         # logging.debug('UART-IN-ORIGIN++[%d]: %s', len(data), atos(data))
         # start_index = data.find(0x5A)
-        self.find_start_byte(timeout)
-        packet_type = self.ser.read(1)[0]
+        ack = self.find_start_byte(timeout)
+        ack += self.ser.read(1)
+        logging.debug('UART-IN-ACK[2]: %s', atos(ack))
+        packet_type = ack[1]
+        # packet_type = self.ser.read(1)[0]
         if not packet_type == FPType.ACK:
             if packet_type == FPType.ABORT:
                 raise McuBootDataError(mode='read', errname=StatusCode[0x2712])
             else:
                 raise McuBootDataError('recevice ack error, packet_type={!s}(0x{:X})'
                     .format(FPType(packet_type), packet_type))
-        else:
-            logging.debug('UART-IN-ACK[2]: 5A A1')
 
     # def osend_ack(self, val=True):
     #     ack = [0x5A, 0xA1 if val == True else 0xA7]

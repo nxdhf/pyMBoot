@@ -1,8 +1,9 @@
 import time
+import struct
 import logging
 
 from pyftdi.spi import SpiController
-from struct import pack, unpack
+
 from .misc import atos
 from .protocol import FPType, UartProtocolMixin
 from .exception import McuBootDataError, McuBootTimeOutError
@@ -27,7 +28,7 @@ class SPI(UartProtocolMixin):
         self.controller.configure(url)
         self.slave = self.controller.get_port(cs=0, freq=self.freq, mode=self.mode)
 
-    def close():
+    def close(self):
         """ close the interface """
         self.controller.terminate()
         logging.debug("Close SPI Interface")
@@ -52,14 +53,13 @@ class SPI(UartProtocolMixin):
         #     payload = data[start_index+6:] + data2
         # else:
         #     payload = data[start_index+6:end_index]
-
         start_byte = self.find_start_byte()
         if rx_ack:
             if not self.slave.read(1)[0] == FPType.ACK:
                 raise EnvironmentError
             self.find_start_byte()
-        head = start_byte.tobytes() + self.slave.read(5).tobytes()
-        _, _packet_type, payload_len, crc = unpack('<2B2H', head) # framing packet
+        head = start_byte + self.slave.read(5).tobytes()
+        _, _packet_type, payload_len, crc = struct.unpack('<2B2H', head) # framing packet
         logging.debug('SPI-IN-%s-HEAD[%d]: %s', packet_type.name, len(head), atos(head))
         if not _packet_type == packet_type:
             if _packet_type == FPType.CMD:   # Slave interrupt in read data
@@ -106,9 +106,9 @@ class SPI(UartProtocolMixin):
         #         raise EnvironmentError
 
         start_byte = self.find_start_byte()
-        data = start_byte.tobytes() + self.slave.read(9).tobytes()
+        data = start_byte + self.slave.read(9).tobytes()
         logging.debug('SPI-OUT-PINGR[%d]: %s', len(data), atos(data))
-        _, packet_type, *protocol_version, protocol_name, options, crc = unpack('<6B2H', data)
+        _, packet_type, *protocol_version, protocol_name, options, crc = struct.unpack('<6B2H', data)
         if not packet_type == FPType.PINGR:
                 raise EnvironmentError
         return data
@@ -124,7 +124,8 @@ class SPI(UartProtocolMixin):
 
         # Return before time runs out
         while time.perf_counter() - start_time < timeout:
-            start = self.slave.read(1)  # return array.array
+            self.slave.flush()
+            start = self.slave.read(1).tobytes()    # self.slave.read() return array.array
             # logging.debug('{!r} {}'.format(start, type(start)))
             if start[0] == 0x5A:
                 return start
@@ -144,16 +145,18 @@ class SPI(UartProtocolMixin):
         # data = self.slave.read(0x50).tobytes()
         # logging.debug('SPI-IN-ORIGIN++[%d]: %s', len(data), atos(data))
         # start_index = data.find(0x5A)
-        self.find_start_byte(timeout)
-        packet_type = self.slave.read(1)[0]
+        ack = self.find_start_byte(timeout)
+        ack += self.slave.read(1).tobytes()
+        logging.debug('SPI-IN-ACK[2]: %s', atos(ack))
+        packet_type = ack[1]
+        # print('{0:#X} {1}'.format(packet_type, type(packet_type)))
         if not packet_type == FPType.ACK:
             if packet_type == FPType.ABORT:
                 raise McuBootDataError(mode='read', errname=StatusCode[0x2712])
             else:
                 raise McuBootDataError('recevice ack error, packet_type={!s}(0x{:X})'
                     .format(FPType(packet_type), packet_type))
-        else:
-            logging.debug('SPI-IN-ACK[2]: 5A A1')
+
 
     def _read_command_packet(self, length=20, rx_ack=True, tx_ack=False):
         data = self.slave.read(length).tobytes()
