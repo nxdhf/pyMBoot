@@ -103,7 +103,8 @@ def check_int(value):
     try:
         value = int(value, 0)
     except ValueError:
-        raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
+        # raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
+        raise ValueError("%s is an invalid positive int value" % values)
     else:
         return value
 

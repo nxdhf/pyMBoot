@@ -19,6 +19,9 @@ class MemoryBlock(object):
         else:
             raise TypeError('The parameter requires a list or tuple, not {}'.format(type(sequence)))
         return cls(start, end)
+    
+    def __len__(self):
+        return self.length
 
     def __str__(self):
         return '{} start:{:#010x} end:{:#010x} length: {:#010x} @{}'.format(self.__class__.__name__,
