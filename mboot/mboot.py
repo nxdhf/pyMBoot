@@ -310,6 +310,14 @@ class McuBoot(object):
         str_value = '\n '.join(str_list)
         return str_value
 
+    def setup_external_memory(self, memory_id, ex_setup):
+        start_config_address = fill_config_address = ex_setup[0]
+        external_config = ex_setup[1:]
+        for word in external_config:
+            self.fill_memory(fill_config_address, 4, word)
+            fill_config_address += 4
+        self.configure_memory(memory_id, start_config_address)
+
     def flash_erase_all(self, memory_id = 0):
         """ MCUBoot: Erase complete flash memory without recovering flash security section
         CommandTag: 0x01
