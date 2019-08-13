@@ -1,3 +1,4 @@
+import inspect
 import bincopy
 from .exception import McuBootGenericError
 
@@ -26,27 +27,25 @@ def check_method_arg_number(func, args_len):
     :return Result of judgment
     :rtype: bool
     """
+    pass_flag = False
+    ori_func = inspect.unwrap(func)
+    ori_args = inspect.getfullargspec(ori_func)
+    func_args_len = len(ori_args.args) if ori_args.args else 0
 
-    '''Calculate the number of arguments required by a function
-    Note: 'co_argcount' not including * or ** args,
-    Because we do not use the indefinite arguments in our function, we can do this.
-    '''
-    func_args_len = func.__code__.co_argcount
-
-    if hasattr(func, '__self__'):   # instance/class method, subtract the 'self/cls' arg
+    # instance/class method, subtract the 'self/cls' arg
+    if 'self' in ori_args.args:
         func_args_len -= 1
+    
+    min_func_args_len = func_args_len - len(ori_args.defaults) if ori_args.defaults else func_args_len
 
-    # Subtract the number of arguments with default values
-    # min_func_args_len = func_args_len - len(getattr(func, '__defaults__', ''))
-    if func.__defaults__:
-        min_func_args_len = func_args_len - len(func.__defaults__)
+    if ori_args.varargs or ori_args.varkw:
+        # The number of functions accepted by the function has no maximum
+        if args_len >= min_func_args_len:
+            pass_flag = True
     else:
-        min_func_args_len = func_args_len
-
-    if min_func_args_len <= args_len <= func_args_len:
-        return True
-    else:
-        return False
+        if min_func_args_len <= args_len <= func_args_len:
+            pass_flag = True
+    return pass_flag
 
 def convert_arg_to_int(cmd_args):
     """Convert str to int as much as possible
