@@ -22,6 +22,7 @@ from .spi import SPI
 from .i2c import I2C
 from .memorytool import MemoryBlock, Memory, Flash
 from .peripheral import parse_port
+from .decorator import clock
 
 ########################################################################################################################
 # Helper functions
@@ -330,6 +331,14 @@ class McuBoot(object):
         timeout = 300 if self.timeout == 1 else self.timeout
         self._itf_.write_cmd(cmd, timeout = timeout)
 
+    '''                             
+    MT64 UART 57600
+    len             size    time
+    0x00010000      64K     0.02749509
+    0x00100000      1M      0.03662174
+    0x01000000      16M     0.47802436
+    '''
+    # @clock
     def flash_erase_region(self, start_address, length, memory_id = 0):
         """ MCUBoot: Erase specified range of flash
         CommandTag: 0x02
