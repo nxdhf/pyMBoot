@@ -124,11 +124,10 @@ class SPI(UartProtocolMixin):
 
         # Return before time runs out
         while time.perf_counter() - start_time < timeout:
-            self.slave.flush()
-            start = self.slave.read(1).tobytes()    # self.slave.read() return array.array
+            start = self.slave.read(1)   # self.slave.read() return array.array
             # logging.debug('{!r} {}'.format(start, type(start)))
             if start[0] == 0x5A:
-                return start
+                return start.tobytes()
 
         raise McuBootTimeOutError
         
