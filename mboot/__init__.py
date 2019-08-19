@@ -10,11 +10,10 @@ from .peripheral import parse_peripheral, scan_usb, scan_uart, scan_spi, scan_i2
 from .mboot import McuBoot, decode_property_value, is_command_available
 from .decorator import global_error_handler
 from .exception import McuBootGenericError, McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
-from .cli import main
 
 __author__ = "Martin Olejar"
 __contact__ = "martin.olejar@gmail.com"
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 __license__ = "BSD3"
 __status__ = 'Development'
 
@@ -31,6 +30,7 @@ __all__ = [
     'scan_usb',
     'scan_uart',
     'scan_spi',
+    'scan_i2c',
     # classes
     'McuBoot',
     # enums

@@ -6,16 +6,17 @@
 # The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
-import os
-import sys
-import click
-import mboot
-import bincopy
-import traceback
+# import os
+# import sys
+# import click
+# import mboot
+# import bincopy
+# import traceback
 
 ########################################################################################################################
 # Helper methods
 ########################################################################################################################
+'''
 def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
     """ Return string array in hex-dump format
     :param data:          {List} The data array of {Bytes}
