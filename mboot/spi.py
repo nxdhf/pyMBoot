@@ -27,6 +27,7 @@ class SPI(UartProtocolMixin):
         url = 'ftdi://{}:{}/1'.format(vid, pid)
         self.controller.configure(url)
         self.slave = self.controller.get_port(cs=0, freq=self.freq, mode=self.mode)
+        logging.debug("Opening SPI interface")
 
     def close(self):
         """ close the interface """

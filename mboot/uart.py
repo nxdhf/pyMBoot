@@ -65,6 +65,7 @@ class UART(UartProtocolMixin):
         self.ser.writeTimeout = 2                # timeout for write
         try:
             self.ser.open()
+            logging.debug("Opening UART interface")
         except Exception as e:
             print("error open serial port: " + str(e))
 

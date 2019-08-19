@@ -14,14 +14,13 @@ from .enums import CommandTag, PropertyTag, StatusCode
 from .constant import Interface, KeyOperation
 from .misc import atos, size_fmt
 from .tool import read_file, write_file, check_key
-# from .protocol import UartProtocol, UsbProtocol, FPType
 from .exception import McuBootGenericError, McuBootCommandError
 from .uart import UART
 from .usb import RawHID
 from .spi import SPI
 from .i2c import I2C
 from .memorytool import MemoryBlock, Memory, Flash
-from .peripheral import parse_port
+from .peripheral import parse_port, peripheral_speed
 from .decorator import clock
 
 ########################################################################################################################
@@ -131,7 +130,7 @@ class McuBoot(object):
         'USB-DFU':   [0x00000040, 12000000],
     }
 
-    def __init__(self):
+    def __init__(self, level=logging.WARNING):
         self.cli_mode = False
         self._itf_ = None
         self.current_interface = None
@@ -143,6 +142,7 @@ class McuBoot(object):
         # self._pg_start = 0
         # self._pg_end = 100
         # self._abort = False
+        logging.basicConfig(level=level)
 
     # @staticmethod
     # def _parse_status(data):
@@ -159,6 +159,9 @@ class McuBoot(object):
     # def abort(self):
     #     self._abort = True
 
+    def __bool__(self):
+        return bool(self._itf_)
+
     def is_open(self):
         """ MCUBoot: Check if device connected
         """
@@ -174,14 +177,16 @@ class McuBoot(object):
             _vid_pid = parse_port(Interface.USB.name, vid_pid)
         else:   # Default input tuple in cli mode, no conversion required
             _vid_pid = vid_pid
-        dev = RawHID.enumerate(*_vid_pid)[0]
-        if dev is not None:
-            logging.info('Connect: %s', dev.info())
-            self._itf_ = dev    # Already open, simple assignment
+        dev = RawHID.enumerate(*_vid_pid)
+        if len(dev) == 1:
+            logging.info('Connect: %s', dev[0].info())
+            self._itf_ = dev[0] # Already open, simple assignment
             self._itf_.open()
             self.current_interface = Interface.USB
             self.reopen_args = vid_pid
             return True
+        elif len(dev) > 1:
+            raise McuBootGenericError("Can't insert two devices with the same vid, PID at the same time")
         else:
             info = 'Can not find vid,pid: 0x{p[0]:04X}, {p[1]:04X}'.format(p=_vid_pid)
             if self.cli_mode:   # Fast failure in cli mode
@@ -189,7 +194,7 @@ class McuBoot(object):
             logging.info(info)
             return False
 
-    def open_uart(self, port, baudrate):
+    def open_uart(self, port, baudrate=peripheral_speed['uart']):
         """ MCUBoot: Connect by UART
         """
         if self.cli_mode:   # checked in cli mode
@@ -212,11 +217,12 @@ class McuBoot(object):
         #     logging.info('UART Disconnected !')
         #     return False
     
-    def open_spi(self, vid_pid, freq, mode):
+    def open_spi(self, vid_pid, freq=peripheral_speed['spi'], mode=0):
         """ MCUBoot: Connect by UART
         """
         if isinstance(vid_pid, str):
-            _vid_pid = parse_port(Interface.SPI.name, vid_pid)
+            # _vid_pid = parse_port(Interface.SPI.name, vid_pid)
+            _vid_pid, _freq = parse_peripheral(peripheral, args)
         else:   # Default input tuple in cli mode, no conversion required
             _vid_pid = vid_pid
         try:
@@ -232,7 +238,7 @@ class McuBoot(object):
             self.reopen_args = (_vid_pid, freq, mode)
             return True
 
-    def open_i2c(self, vid_pid, freq):
+    def open_i2c(self, vid_pid, freq=peripheral_speed['i2c']):
         """ MCUBoot: Connect by UART
         """
         if isinstance(vid_pid, str):
@@ -442,6 +448,8 @@ class McuBoot(object):
         """
         if isinstance(backdoor_key, str):
             key = check_key(backdoor_key)
+        else:
+            key = backdoor_key
         logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(key))
         # Prepare FlashSecurityDisable command
         cmd = struct.pack('4B', CommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
@@ -550,6 +558,9 @@ class McuBoot(object):
         #         self._itf_.close()
                 
         #         self._itf_.open()
+
+        # the reset command waits for different time to prevent the device from executing the next instruction when it is not ready
+        # but this does not solve the problem of calling through other scripts, which will be resolved in future versions.
         if self.cli_mode == False:
             '''
             uart-57600: 0.01s

@@ -26,6 +26,7 @@ class I2C(UartProtocolMixin):
         self.controller.configure(url, frequency=self.freq)
         # print('frequency', self.controller.frequency)
         self.slave = self.controller.get_port(slave_address)
+        logging.debug("Opening I2C interface")
 
     def close(self):
         """ close the interface """

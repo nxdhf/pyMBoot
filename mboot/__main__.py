@@ -574,13 +574,10 @@ def reset(ctx):
         click.echo()
 
     click.secho(" Reset OK")
+'''
 
 
 def main():
     # cli(obj={})
-    mboot.cli.main()
-
-
-if __name__ == '__main__':
-    # main()
+    from . import cli
     cli.main()
