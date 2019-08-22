@@ -1,10 +1,77 @@
 language: python
 
-dist: xenial
-python:
-  - '3.5'
-  - '3.6'
-  - '3.7'
+matrix:
+  include:
+    - name: "Python 3.7 on Xenial Linux"
+      os: linux
+      dist: xenial
+      python: 3.7
+    - name: "Python 3.6 on Xenial Linux"
+      os: linux
+      dist: xenial
+      python: 3.6
+    - name: "Python 3.5 on Xenial Linux"
+      os: linux
+      dist: xenial
+      python: 3.5
+    - name: "Python 3.7.4 on Windows"
+      os: windows
+      language: shell
+      before_install:
+        - choco install python --version 3.7.4
+        - python -m pip install --upgrade pip
+        - python --version ; pip --version; pip list
+      env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
+    # Note: windows builds are in early access stage.
+    - name: "Python 3.6.8 on Windows"
+      os: windows
+      language: shell
+      before_install:
+        - choco install python --version 3.6.8
+        - python -m pip install --upgrade pip
+        - python --version ; pip --version; pip list
+      env: PATH=/c/Python36:/c/Python36/Scripts:$PATH
+    - name: "Python 3.5.4 on Windows"
+      os: windows
+      language: shell
+      before_install:
+        - choco install python --version 3.5.4
+        - python -m pip install --upgrade pip
+        - python --version ; pip --version; pip list
+      env: PATH=/c/Python35:/c/Python35/Scripts:$PATH
+    - name: "Python 3.7 on macOS"
+      os: osx
+      osx_image: xcode11
+      language: shell
+      before_install:
+        - eval "$(pyenv init -)";
+        - lastest_ver=$(pyenv install --list | grep 3.7 | grep -E "^\s{2}\d+\.\d+\.\d+" | tail -1)
+        - which -a $lastest_ver || (pyenv install $lastest_ver; pyenv global $lastest_ver)
+        - python --version ; pip --version ; sw_vers; pip list
+    - name: "Python 3.6 on macOS"
+      os: osx
+      osx_image: xcode11
+      language: shell
+      before_install:
+        - eval "$(pyenv init -)";
+        - lastest_ver=$(pyenv install --list | grep 3.6 | grep -E "^\s{2}\d+\.\d+\.\d+" | tail -1)
+        - which -a $lastest_ver || (pyenv install $lastest_ver; pyenv global $lastest_ver)
+        - python --version ; pip --version ; sw_vers; pip list
+    - name: "Python 3.5 on macOS"
+      os: osx
+      osx_image: xcode11
+      language: shell
+      before_install:
+        - eval "$(pyenv init -)";
+        - lastest_ver=$(pyenv install --list | grep 3.5 | grep -E "^\s{2}\d+\.\d+\.\d+" | tail -1)
+        - which -a $lastest_ver || (pyenv install $lastest_ver; pyenv global $lastest_ver)
+        - python --version ; pip --version ; sw_vers; pip list
+
+# dist: xenial
+# python:
+#   - '3.5'
+#   - '3.6'
+#   - '3.7'
 
 addons:
   apt:
@@ -12,11 +79,11 @@ addons:
       - pandoc
       
 install:
-  # - pip3 install pytest pytest-console-scripts
-  # - pip3 install pytest-cov
-  # - pip3 install coveralls
-  - pip3 install -r requirements.txt
-  - pip3 install -e ".[test]"
+  # - pip install pytest pytest-console-scripts
+  # - pip install pytest-cov
+  # - pip install coveralls
+  - pip install -r requirements.txt
+  - pip install -e ".[test]"
   - mboot
   
 script:
@@ -26,7 +93,7 @@ script:
 #   - coveralls
   
 # before_deploy:
-  # - pip3 install pypandoc
+  # - pip install pypandoc
 
 # deploy:
 #   provider: pypi
