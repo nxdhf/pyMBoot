@@ -6,10 +6,13 @@
 # The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
+import re
 from os import path
 from setuptools import setup, find_packages
-from mboot import __version__, __license__, __author__, __contact__
+# from mboot import __version__, __license__, __author__, __contact__
 
+with open("mboot/__init__.py", "rt", encoding="utf8") as f:
+    __version__ = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
 def long_description():
     try:

@@ -13,9 +13,9 @@ from .exception import McuBootGenericError, McuBootCommandError, McuBootDataErro
 
 __author__ = "Martin Olejar"
 __contact__ = "martin.olejar@gmail.com"
-__version__ = '0.3.0'
+__version__ = "0.3.0"
 __license__ = "BSD3"
-__status__ = 'Development'
+__status__ = "Development"
 
 __all__ = [
     # global methods
