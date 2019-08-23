@@ -4,7 +4,7 @@ import logging
 
 from pyftdi.i2c import I2cController
 
-from .misc import atos
+from .tool import atos
 from .protocol import FPType, UartProtocolMixin
 from .exception import McuBootDataError, McuBootTimeOutError
 from .enums import StatusCode

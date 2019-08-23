@@ -1,6 +1,39 @@
 import inspect
+from string import printable
+
 import bincopy
+
 from .exception import McuBootGenericError
+
+def size_fmt(value, use_kibibyte=True):
+    """ Convert integer value to string with size mark
+    :param value:
+    :param use_kibibyte:
+    :return:
+    """
+    base, suffix = [(1000., 'B'), (1024., 'iB')][use_kibibyte]
+    for x in ['B'] + [x + suffix for x in list('kMGTP')]:
+        if -base < value < base:
+            break
+        value /= base
+    return "{0:3.1f} {1:s}".format(value, x)
+
+
+def atos(data, separator=' ', fmt='02X'):
+    """ Convert array of bytes to string
+    :param data: Data in bytes or bytearray type
+    :param separator: String separator
+    :param fmt: String format
+    :return string
+    """
+    ret = ''
+    for x in data:
+        if fmt == 'c' and x not in printable.encode():
+            ret += '.'
+            continue
+        ret += ('{:'+fmt+'}').format(x)
+        ret += separator
+    return ret
 
 def crc16(data, crc=0, poly=0x1021):
     '''Default calculate CRC-16/XMODEM

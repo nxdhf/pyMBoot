@@ -12,8 +12,7 @@ import struct
 # relative imports
 from .enums import CommandTag, PropertyTag, StatusCode
 from .constant import Interface, KeyOperation
-from .misc import atos, size_fmt
-from .tool import read_file, write_file, check_key
+from .tool import read_file, write_file, check_key, atos, size_fmt
 from .exception import McuBootGenericError, McuBootCommandError
 from .uart import UART
 from .usb import RawHID
@@ -317,9 +316,9 @@ class McuBoot(object):
         str_value = '\n '.join(str_list)
         return str_value
 
-    def setup_external_memory(self, memory_id, ex_setup):
-        start_config_address = fill_config_address = ex_setup[0]
-        external_config = ex_setup[1:]
+    def setup_external_memory(self, memory_id, exconf):
+        start_config_address = fill_config_address = exconf[0]
+        external_config = exconf[1:]
         for word in external_config:
             self.fill_memory(fill_config_address, 4, word)
             fill_config_address += 4

@@ -12,11 +12,11 @@ import logging
 
 import serial
 
-from .misc import atos
+from .tool import atos
 from .protocol import FPType, UartProtocolMixin
 from .exception import McuBootDataError, McuBootTimeOutError
 from .enums import StatusCode
-# from .misc import crc16
+# from .tool import crc16
 
 ########################################################################################################################
 # UART Interface Class

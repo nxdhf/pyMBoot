@@ -3,8 +3,7 @@ from enum import Enum
 import struct
 import logging
 
-from .misc import atos
-from .tool import crc16
+from .tool import atos, crc16
 from .enums import CommandTag, PropertyTag, StatusCode
 from .exception import McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
 

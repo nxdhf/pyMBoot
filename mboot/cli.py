@@ -51,7 +51,7 @@ def parse_args(parser, subparsers, command=None):
         parser._parse_known_args(list(argv), namespace=n)
     return args
 
-def info(mb, memory_id=0, ex_setup=None):
+def info(mb, memory_id=0, exconf=None):
     nfo = mb.get_mcu_info()
     # Print MCUBoot MCU Info
     for key, value in nfo.items():
@@ -63,12 +63,12 @@ def info(mb, memory_id=0, ex_setup=None):
         print(m)
 
     if memory_id:
-        if ex_setup:
-            mb.setup_external_memory(memory_id, ex_setup)
+        if exconf:
+            mb.setup_external_memory(memory_id, exconf)
         info = mb.get_exmemory_info(memory_id)
         print(info)
 
-def write(mb, address, filename, memory_id=0, offset=0, no_erase=False, ex_setup=None):
+def write(mb, address, filename, memory_id=0, offset=0, no_erase=False, exconf=None):
     do_erase = not no_erase
     mb.get_memory_range()
     data, start_address = read_file(filename, address)
@@ -76,15 +76,16 @@ def write(mb, address, filename, memory_id=0, offset=0, no_erase=False, ex_setup
     data = data[offset:]
     block = MemoryBlock(start_address, None, length)
     if memory_id:
-        if ex_setup:
-            mb.setup_external_memory(memory_id, ex_setup)
+        if exconf:
+            mb.setup_external_memory(memory_id, exconf)
         # Some device do not support EXTERNAL_MEMORY_ATTRIBUTES Property, so external memory will not check memory range
 
         if do_erase:
             mb.flash_erase_region(start_address, length, memory_id)
     else:
-        if mb.is_in_flash(block) and do_erase:   # erase first if block in the flash area
-            mb.flash_erase_region(block.start, block.length)
+        if mb.is_in_flash(block):
+            if do_erase:    # erase first if block in the flash area
+                mb.flash_erase_region(block.start, block.length)
         elif mb.is_in_memory(block):
             pass
         else:
@@ -92,12 +93,12 @@ def write(mb, address, filename, memory_id=0, offset=0, no_erase=False, ex_setup
         start = mb.get_property(PropertyTag.RAM_START_ADDRESS)
     mb.write_memory(start_address, data, memory_id)
 
-def read(mb, address, length, filename=None, memory_id=0, compress=False, ex_setup=None):
+def read(mb, address, length, filename=None, memory_id=0, compress=False, exconf=None):
     mb.get_memory_range()
     block = MemoryBlock(address, None, length)
     if memory_id:
-        if ex_setup:
-            mb.setup_external_memory(memory_id, ex_setup)
+        if exconf:
+            mb.setup_external_memory(memory_id, exconf)
         # Some device do not support EXTERNAL_MEMORY_ATTRIBUTES Property, so external memory will not check memory range
     else:
         if not (mb.is_in_flash(block) or mb.is_in_memory(block)):
@@ -112,20 +113,22 @@ def read(mb, address, length, filename=None, memory_id=0, compress=False, ex_set
 #         except McuBootGenericError as e:
 #             err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
-def fill(mb, address, byte_count, pattern, unit):
+def fill(mb, address, byte_count, pattern, unit, no_erase=False):
+    do_erase = not no_erase
     mb.get_memory_range()
     block = MemoryBlock(address, None, byte_count*8)
     if mb.is_in_flash(block):
-        mb.flash_erase_region(block.start, block.length)
+        if do_erase:
+            mb.flash_erase_region(block.start, block.length)
     elif mb.is_in_memory(block):
         pass
     else:
         raise McuBootGenericError('MemoryRangeInvalid, please check the address range.')
     mb.fill_memory(address, byte_count, pattern, unit)
 
-def erase(mb, address, length, memory_id=0, erase_all = False, ex_setup=None):
-    if memory_id and ex_setup:
-        mb.setup_external_memory(memory_id, ex_setup)
+def erase(mb, address, length, memory_id=0, erase_all = False, exconf=None):
+    if memory_id and exconf:
+        mb.setup_external_memory(memory_id, exconf)
     if erase_all:
         # Get available commands
         commands = mb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)
@@ -416,10 +419,12 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-u', '--usb', nargs='?', const=[], default=None, 
         help='Use usb peripheral, such as "-u VIDPID", "-u"', metavar='vid,pid')
-    group.add_argument('-p', '--uart', nargs='*', help='Use uart peripheral', metavar=('port', 'speed'))
+    group.add_argument('-p', '--uart', nargs='*', help='Use uart peripheral, '
+        'such as "-p PORT SPEED", "-p PORT", "-p SPEED", "-p"', metavar=('port', 'speed'))
     group.add_argument('-s', '--spi', nargs='*', help='Use spi peripheral, '
         'such as "-s VIDPID SPEED", "-s VIDPID", "-s SPEED", "-s"', metavar=('vid,pid', 'speed'))
-    group.add_argument('-i', '--i2c', nargs='*', help='Use i2c peripheral', metavar=('vid,pid', 'speed'))
+    group.add_argument('-i', '--i2c', nargs='*', help='Use i2c peripheral, '
+        'such as "-i VIDPID SPEED", "-i VIDPID", "-i SPEED", "-i"', metavar=('vid,pid', 'speed'))
 
     parser.add_argument('-t', '--timeout', type=int, help='Maximum wait time(Unit: s) for the change of the transceiver status in a single atomic operation, '
         'it is only valid for the "flash-erase-*" command and only changes the timeout of the ack after sending the packet, '
@@ -437,7 +442,7 @@ def main():
     parser_info = subparsers.add_parser('info', help='Get MCU info (mboot properties)', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_info.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x010, 0x100, 0x101, 0x110, 0x120, 0x121), 
         help='External memory id, Display external memory information if it is already executed configure-memory', metavar='memory_id')
-    parser_info.add_argument('-e', '--ex_setup', nargs='*', type=check_int, help='Set external memory address and settings, '
+    parser_info.add_argument('-e', '--exconf', nargs='*', type=check_int, help='Set external memory address and settings, '
         'such as "fill_config_address config_word1 [config_word2 [...]]", only the first time you need to set')
     parser_info.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
@@ -449,7 +454,7 @@ def main():
         help='External memory id', metavar='memory_id')
     parser_write.add_argument('-o', '--offset', type=check_int, default=0, help='File offset address')
     parser_write.add_argument('--no_erase', action='store_true', help='Do not automatically erase before writing.')
-    parser_write.add_argument('-e', '--ex_setup', nargs='*', type=check_int, help='Set external memory address and settings, '
+    parser_write.add_argument('-e', '--exconf', nargs='*', type=check_int, help='Set external memory address and settings, '
         'such as "fill_config_address config_word1 [config_word2 [...]]", only the first time you need to set')
     parser_write.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
@@ -460,7 +465,7 @@ def main():
     parser_read.add_argument('memory_id', nargs='?', type=check_int, action=FixArgValue, check_arg='filename', default=0, 
         choices=(0, 0x1, 0x8, 0x9, 0x010, 0x100, 0x101, 0x110, 0x120, 0x121), help='External memory id', metavar='memory_id')
     parser_read.add_argument('-c', '--compress', action='store_true', help='Compress dump output.')
-    parser_read.add_argument('-e', '--ex_setup', nargs='*', type=check_int, help='Set external memory address and settings, '
+    parser_read.add_argument('-e', '--exconf', nargs='*', type=check_int, help='Set external memory address and settings, '
         'such as "fill_config_address config_word1 [config_word2 [...]]", only the first time you need to set')
     parser_read.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
@@ -470,15 +475,16 @@ def main():
     parser_fill.add_argument('pattern', type=check_int, help='The pattern used for padding, (default: 0xFFFFFFFF)')
     parser_fill.add_argument('unit', nargs='?', choices=['word', 'short', 'byte'], default='word', 
         help='Process pattern according to word, short(half-word), byte')
+    parser_fill.add_argument('--no_erase', action='store_true', help='Do not automatically erase before writing.')
     parser_fill.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
     parser_erase = subparsers.add_parser('erase', help='Erase MCU memory', formatter_class=MBootSubHelpFormatter, add_help=False)
-    parser_erase.add_argument('address', type=check_int, help='Start address')
-    parser_erase.add_argument('length', type=check_int, default=0x100, help='Erase data length')
+    parser_erase.add_argument('address', nargs='?', type=check_int, help='Start address')
+    parser_erase.add_argument('length', nargs='?', type=check_int, default=0x100, help='Erase data length')
     parser_erase.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x010, 0x100, 0x101, 0x110, 0x120, 0x121), 
         help='External memory id', metavar='memory_id')
     parser_erase.add_argument('-a', '--all', action='store_true', help='Erase complete MCU memory')
-    parser_erase.add_argument('-e', '--ex_setup', nargs='*', type=check_int, help='Set external memory address and settings, '
+    parser_erase.add_argument('-e', '--exconf', nargs='*', type=check_int, help='Set external memory address and settings, '
         'such as "fill_config_address config_word1 [config_word2 [...]]", only the first time you need to set')
     parser_erase.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
 
@@ -495,7 +501,7 @@ def main():
         cmd.debug += 1
     logging.basicConfig(level=log_level[cmd.debug])
 
-    # print(cmd)
+    print(cmd)
 
     mb = mboot.McuBoot()
     mb.cli_mode = True  # this is cli mode
@@ -533,33 +539,35 @@ def main():
         args = cmd.info
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
-        info(mb, args.memory_id, args.ex_setup)
+        info(mb, args.memory_id, args.exconf)
 
     if cmd.write:
         args = cmd.write
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
-        write(mb, args.address, args.filename, args.memory_id, args.offset, args.no_erase, args.ex_setup)
+        write(mb, args.address, args.filename, args.memory_id, args.offset, args.no_erase, args.exconf)
         print(" Wrote Successfully.")
 
     if cmd.read:
         args = cmd.read
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
-        read(mb, args.address, args.length, args.filename, args.memory_id, args.compress, args.ex_setup)
+        read(mb, args.address, args.length, args.filename, args.memory_id, args.compress, args.exconf)
 
     if cmd.fill:
         args = cmd.fill
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
-        fill(mb, args.address, args.byte_count, args.pattern, args.unit)
+        fill(mb, args.address, args.byte_count, args.pattern, args.unit, args.no_erase)
         print(" Filled Successfully.")
 
     if cmd.erase:
         args = cmd.erase
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
-        erase(mb, args.address, args.length, args.memory_id, args.all, args.ex_setup)
+        if args.address is None and not args.all:
+            raise McuBootGenericError('If you do not use the full-chip erase mode, you must enter the erase address.')
+        erase(mb, args.address, args.length, args.memory_id, args.all, args.exconf)
         print(" Erased Successfully.")
 
     if cmd.unlock:

@@ -4,7 +4,7 @@ import logging
 
 from pyftdi.spi import SpiController
 
-from .misc import atos
+from .tool import atos
 from .protocol import FPType, UartProtocolMixin
 from .exception import McuBootDataError, McuBootTimeOutError
 from .enums import StatusCode

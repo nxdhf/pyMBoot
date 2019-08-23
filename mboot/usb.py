@@ -9,7 +9,7 @@ import logging
 import collections
 from time import time
 from struct import pack, unpack_from
-from .misc import atos
+from .tool import atos
 from .protocol import UsbProtocolMixin
 
 #os.environ['PYUSB_DEBUG'] = 'debug'
