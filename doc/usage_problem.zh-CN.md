@@ -1,5 +1,29 @@
 [English](usage_problem.md) | 简体中文
 
+### 执行`pip install`时出现`TypeError`错误？
+
+如果出现“TypeError: 'encoding' is an invalid keyword argument for this function”，请确保你使用的是`pip3`，如果它没有安装，在`ubuntu`上你可以使用以下命令安装：
+
+```sh
+$ sudo apt update
+$ sudo apt install python3-pip
+```
+
+`windows`下会自动安装当前python版本对应的`pip`，不用安装。
+
+### 安装成功但运行时命令行提示没有找到mboot命令？
+
+因为`linux/macOS`的权限问题，如果你没有使用`sudo`安装，它会被安装到用户目录，请检查你的`$PATH`，你可以手动通过下面的命令添加用户目录：
+
+```sh
+$ export PATH=$PATH:~/.local/bin
+# If you need to open bash the next time it still works, you need to modify ~/.bashrc and add the above command at the end.
+$ vi ~/.bashrc  # if you use zsh, modify ~/.zshrc
+# Configuration takes effect immediately
+$ source ~/.bachrc
+```
+windows下通常会全局安装，如果没有，请在`PATH`中添加用户目录，例如`C:\Users\Username\AppData\Roaming\Python36\Scripts`。
+
 ### 设备出错如何调试？
 
 使用`-d`选项你可以看到运行过程中执行了那些命令，而使用`-d 2`选项你可以看到总线上具体发送的数据，重启设备以避免上一个错误的影响，尤其对于`uart`设备来说。 

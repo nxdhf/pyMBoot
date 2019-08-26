@@ -1,5 +1,30 @@
 English | [简体中文](usage_problem.zh-CN.md)
 
+### TypeError error when executing pip install?
+
+if "TypeError: 'encoding' is an invalid keyword argument for this function" occurs, make sure that you are currently using pip3. If it is not installed, on ubuntu, you can use the following command to install it.
+
+```sh
+$ sudo apt update
+$ sudo apt install python3-pip
+```
+
+the `pip` corresponding to the current Python version will be installed automatically under `Windows` without manual installation.
+
+### Installation was successful but the CLI prompt mboot command was not found?
+
+Because of the `Linux/macOS` privilege problem, if you do not use `sudo` installation permissions, it will be installed to the user directory, please check your `$PATH`, you can manually add the user directory through the following command.
+
+```sh
+$ export PATH=$PATH:~/.local/bin
+# If you need to open bash the next time it still works, you need to modify ~/.bashrc and add the above command at the end.
+$ vi ~/.bashrc  # if you use zsh, modify ~/.zshrc
+# Configuration takes effect immediately
+$ source ~/.bachrc
+```
+
+Usually under windows, it is installed globally. If not, add a user directory to `PATH`, such as `C:\Users\Username\AppData\Roaming\Python36\Scripts`.
+
 ### How to debug the device error?
 
 Using the `-d` option you can see which commands were executed during the run, and with the `-d 2` option you can see the specific data sent on the bus. Reboot the device to avoid the effects of the previous error, especially for `Uart` device.

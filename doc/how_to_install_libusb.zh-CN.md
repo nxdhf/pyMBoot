@@ -17,7 +17,7 @@
 你应该首先安装`libusb`：
 
 ```sh
-$ apt-get install libusb-1.0
+$ apt install libusb-1.0
 ```
 
 然后，您需要创建一个udev配置文件，以允许用户空间进程访问FTDI设备。有很多方法可以配置udev，这是一个典型的设置：

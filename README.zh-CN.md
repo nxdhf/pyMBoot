@@ -25,13 +25,13 @@
 对于一般用户，可以从`.whl`分发包安装它，你可以在项目的发布(Release)中找到它并下载它，运行以下命令来安装它：
 
 ```sh
-pip install mboot-*.whl
+pip3 install mboot-*.whl
 ```
 
 你也可以通过克隆手动安装它的最新版本：
 
 ```sh
-pip install -U https://github.com/nxdhf/pyMBoot/archive/master.zip
+pip3 install -U https://github.com/nxdhf/pyMBoot/archive/master.zip
 ```
 
 在开发的情况下，建议使用虚拟环境，通过克隆github源来安装它：
@@ -41,8 +41,10 @@ $ git clone https://github.com/nxdhf/pyMBoot
 $ cd pyMBoot
 $ pipenv install            # pipenv will automatically install dependencies by requirements.txt
 $ pipenv shell
-$ pip install -e .
+$ pip3 install -e .
 ```
+
+有时候用户目录可能没有添加到`PATH`中，所以其命令行功能会存在问题，关于这一点，请参考[usage_problem](doc/usage_problem.zh-CN.md#安装成功但运行时命令行提示没有找到mboot命令？)
 
 为了通过`spi`，`i2c`协议与设备通信，你需要一个FTDI设备作为桥接器。有关详细信息，请参阅[How to install libusb](doc/how_to_install_libusb.zh-CN.md)
 

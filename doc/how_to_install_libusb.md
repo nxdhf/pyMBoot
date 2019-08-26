@@ -17,7 +17,7 @@ For Debian/Ubuntu:
 You should install `libusb` first:
 
 ```sh
-$ apt-get install libusb-1.0
+$ sudo apt install libusb-1.0
 ```
 
 then you need to create a udev configuration file to allow user-space processes to access to the FTDI devices. There are many ways to configure udev, here is a typical setup:

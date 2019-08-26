@@ -25,13 +25,13 @@ This project come from the fork of [pyMBoot][1], and join the support for `uart`
 For general users, install it from the .whl distribution package, you can find it in the project release and download it, run the following command to install it:
 
 ```sh
-pip install mboot-*.whl
+pip3 install mboot-*.whl
 ```
 
 you can also install the latest version of it manually by cloning:
 
 ```sh
-pip install -U https://github.com/nxdhf/pyMBoot/archive/master.zip
+pip3 install -U https://github.com/nxdhf/pyMBoot/archive/master.zip
 ```
 
 In case of development, It is recommended to use a virtual environment, install it from cloned github sources:
@@ -41,8 +41,11 @@ $ git clone https://github.com/nxdhf/pyMBoot
 $ cd pyMBoot
 $ pipenv install            # pipenv will automatically install dependencies by requirements.txt
 $ pipenv shell
-$ pip install -e .
+$ pip3 install -e .
 ```
+
+Sometimes the user directory may not be added to `PATH`, so there are problems with its CLI functionality. For this, please refer to
+[usage problem](doc/usage_problem.md#Installation%20was%20successful%20but%20the%20CLI%20prompt%20mboot%20command%20was%20not%20found?)
 
 In order to communicate with the device via `spi`, `i2c` protocol, you need a FTDI device as a bridge, For details, see [How to install libusb](doc/how_to_install_libusb.md)
 
