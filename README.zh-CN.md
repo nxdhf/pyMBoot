@@ -1,14 +1,14 @@
-English | [简体中文](README.zh-CN.md)
+[English](README.md) | 简体中文
 
 ## pyMBoot
 
 [![Build Status](https://travis-ci.org/nxdhf/pyMBoot.svg?branch=master)](https://travis-ci.org/nxdhf/pyMBoot) [![Python Version](https://img.shields.io/badge/python-3-blue)](https://www.python.org) [![License](https://img.shields.io/github/license/nxdhf/pyMBoot)](https://github.com/nxdhf/pyMBoot/blob/master/LICENSE)
 
-`pyMBoot` is an Open Source python based library for viewing, configuring NXP Microcontrolers and upgrading the firmware in it via embedded MCUBOOT (MCU Bootloader). It is committed to providing a human interface that makes operation easier.
+`pyMBoot`是一个基于python的开源库，用于通过嵌入式MCUBOOT(MCU Bootloader)查看，配置恩智浦微控制器和其中的固件。它致力于提供一个人性化的界面，使操作更容易。
 
-This project come from the fork of [pyMBoot][1], and join the support for `uart`, `spi`, `i2c` peripherals. In addition to this, I uses `argprase` instead of `click` to rewrite the CLI part, this provides a more user-friendly interface, more consistent and you can omit some fixed parameters. Compared with the original project, a new direct call to the `MCU Boot Original Interface` is added in CLI. With the addition of error capture and tools, it is now possible to call functions directly without the need for users to catch exceptions.
+这个项目是[pyMBoot][1]的`fork`，并加入对`uart`，`spi`，`i2c`外围设备的支持。除此之外，我使用`argprase`而不是`click`来重写CLI部分，这提供了一个更加用户友好的界面，更加一致的接口，你可以省略一些固定的参数。与原始项目相比，CLI中添加了对`MCU Boot Original Interface`的直接调用。并且添加错误捕获和工具，现在可以直接调用函数，而无需用户捕获异常。
 
-> This project is still in developing phase. Please, test it and report founded issues.
+> 该项目仍处于发展阶段。请测试并报告已成立的问题。
 
 ### Dependencies
 
@@ -22,19 +22,19 @@ This project come from the fork of [pyMBoot][1], and join the support for `uart`
 
 ### Installation
 
-For general users, install it from the .whl distribution package, you can find it in the project release and download it, run the following command to install it:
+对于一般用户，可以从`.whl`分发包安装它，你可以在项目的发布(Release)中找到它并下载它，运行以下命令来安装它：
 
 ```sh
 pip install mboot-*.whl
 ```
 
-you can also install the latest version of it manually by cloning:
+你也可以通过克隆手动安装它的最新版本：
 
 ```sh
 pip install -U https://github.com/nxdhf/pyMBoot/archive/master.zip
 ```
 
-In case of development, It is recommended to use a virtual environment, install it from cloned github sources:
+在开发的情况下，建议使用虚拟环境，通过克隆github源来安装它：
 
 ```sh
 $ git clone https://github.com/nxdhf/pyMBoot
@@ -44,11 +44,11 @@ $ pipenv shell
 $ pip install -e .
 ```
 
-In order to communicate with the device via `spi`, `i2c` protocol, you need a FTDI device as a bridge, For details, see [How to install libusb](doc/how_to_install_libusb.md)
+为了通过`spi`，`i2c`协议与设备通信，你需要一个FTDI设备作为桥接器。有关详细信息，请参阅[How to install libusb](doc/how_to_install_libusb.zh-CN.md)
 
 ### mboot core
 
-The following example is showing how to use `mboot` module in your code.
+以下示例显示如何在代码中使用`mboot`模块。
 
 ``` python
 import mboot
@@ -78,14 +78,13 @@ else:
     # ...
 ```
 
-communicate through `uart`, `spi`, `i2c` is similar to the above.
+通过`uart`, `spi`, `i2c`进行交互与上面类似。
 
 ### mboot CLI
 
-`pyMBoot` is distributed with command-line utility `mboot`, which presents the complete functionality of this library.
-If you write `mboot` into shell and click enter, then you get the description of its usage. For getting the help of individual commands just use `mboot subcommand -h/--help`.
+`pyMBoot`与命令行实用程序`mboot`一起分发，它提供了该库的完整功能。如果你在shell中输入`mboot`并敲击enter，那么你会得到它的用法描述。要获得单个命令的帮助，只需使用`mboot subcommand -h/--help`。
 
-All available commands for mboot are as follows:
+mboot的所有可用命令如下：
 
 ```sh
 $ mboot -h
@@ -126,23 +125,23 @@ MCU Boot User Interface:
     reset                          Reset MCU
 ```
 
-To use `mboot` you need to choose the connected peripherals, such as `--usb`, `--uart`, `--spi`, `--i2c` option. Of course, you can only choose one of them and enter the corresponding value, `VIDPID` can be split using `:` or `,`. For specific usage, see the help above. If no value is added after the option, `mboot` will try to search for the device automatically.
+要使用`mboot`，你需要选择连接的外围设备的方式，例如`--usb`，`--uart`，`--spi`，`--i2c`选项。当然，你只能选择其中一个并输入相应的值，`VIDPID`可以用`:`或`,`来分割。有关具体用法，请参阅上面的帮助。如果选项后没有添加任何值，`mboot`将尝试自动搜索设备。
 
-Timeout means the maximum wait time for the change of the transceiver status in a single atomic operation. The `-t`/`--timeout` option is only valid for the `flash-erase-region`, `flash-erase-all`, `flash_erase-all-unsecure` command and only changes the timeout of the ack after sending the packet, which is invalid for the timeout in read phase.
+超时(timeout)指在单个原子操作中更改收发器状态的最长等待时间。`-t` /`--timeout`选项仅对`flash-erase-region`，`flash-erase-all`，`flash_erase-all-unsecure`命令有效，并且仅在发送数据包后改变ack的超时时间，这对于读取阶段的超时是无效的。
 
-You can use the `-d`/`--debug` option to turn on log output. `-d` for output info, `-d 2` for output debug, which will print the details of the send and receive and output a callback when an error occurs, usually only if you develop the framework. Note that `MCU Boot Original Interface` default level is one level higher than `MCU Boot User Interface`, unless it is already the highest level that can be set.
+你可以使用`-d` /`--debug`选项打开日志输出。 `-d`用于输出信息(info)，`-d 2`用于输出调试(debugs)，它将打印发送和接收的详细信息，并在发生错误时输出回调，通常只有在你开发框架时使用。请注意，`MCU Boot Original Interface`默认级别比`MCU Boot User Interface`高一级，除非它已经是可以设置的最高级别。
 
-`mboot` provides two interfaces: `MCU Boot User Interface` and `MCU Boot Original Interface`
+`mboot`提供了两种接口`MCU Boot User Interface`和`MCU Boot Original Interface`
 
 #### MCU Boot User Interface
 
-`MCU Boot User Interface` is an enhanced `MCU Boot Original Interface`. It performs some extra operations to simplify your input. For example, when you use the `write` command, if the write object is flash, it will be erased first. In addition, it also contains the range inspection, etc.
+`MCU Boot User Interface`是一个增强的`MCU Boot Original Interface`。它执行一些额外的操作来简化你的输入。例如，当你使用`write`命令时，如果写入对象是闪存，则它将首先被擦除。此外，它还包含范围检查等。
 
-You can use the command `mboot <user interface command name> -h` to see the help of User Interface subcommand.
+你可以使用命令`mboot <user interface command name> -h`来查看关于`User Interface`子命令的帮助。
 
 ##### info
 
-You can view the current device information by entering the subcommand `info`, If you enter the `memory_id`, it will display additional information about the external memory(if external memory has been set). Don't forget to use `-u`, `-p`, `-s`, `-i` option to select the peripherals.
+你可以通过输入子命令`info`来查看当前设备信息。如果输入`memory_id`选项，它将显示有关外部存储器的其他信息（如果已设置外部存储器）。使用时不要忘记使用`-u`，`-p`，`-s`，`-i`选项来选择连接的方式。
 
 ```sh
 $ mboot info -h
@@ -161,7 +160,7 @@ optional arguments:
 
 #### read
 
-Subcommand `read` can read RAM and flash data. For external memory, you need to specify the `memory_id`, and you need to make sure the external memory has been set, you can quickly set it with the `--exconf` option. After `--compress` option is set, the `*` will be used to fill the duplicate rows. The rest of the args are the same as the `read-memory` command of the `MCU Original Interface`.
+子命令`read`可以读取RAM和闪存数据。对于外部存储器，你需要指定`memory_id`，并且需要确保已设置外部存储器，你可以使用`--exconf`选项快速设置它。设置`--compress`选项后，`*`将用于填充重复的行。其余的参数与`MCU Original Interface`的`read-memory`命令相同。
 
 ```sh
 $ mboot read -h
@@ -183,7 +182,7 @@ optional arguments:
 
 #### write
 
-Subcommand `write` can write RAM and flash data. For external memory, you need to specify the `memory_id`, and you need to make sure the external memory has been set, you can quickly set it with the `--exconf` option. This subcommand will automatically execute the erase command before writing to flash, you can disable auto-erase by using `--no_erase` flag. The rest of the args are the same as the `write-memory` command of the `MCU Original Interface`. It is noteworthy that this command supports reading different types of files, some files have `address` parameters, so the position parameter `address` in the command can be omitted.
+子命令`write`可以写入RAM和闪存数据。对于外部存储器，你需要指定`memory_id`，并且需要确保已设置外部存储器，你可以使用`--exconf`选项快速设置它。该子命令将在写入闪存之前自动执行擦除命令，你可以使用`--no_erase`标志禁用自动擦除。其余的参数与`MCU Original Interface`的`write-memory`命令相同。值得注意的是，该命令支持读取不同类型的文件，而有些文件具有`address`参数，因此命令中的位置参数`address`可以省略。
 
 ```sh
 $ mboot write -h
@@ -208,7 +207,7 @@ optional arguments:
 
 #### fill
 
-Subcommand `fill` can fill `pattern` to RAM and flash, This subcommand do not support external memory. It will automatically execute the erase command before writing to flash, you can disable auto-erase by using `--no_erase` flag. The rest of the args are the same as the `fill-memory` command of the `MCU Original Interface`.
+子命令`fill`可以将`pattern`填充到RAM和flash中，该子命令不支持外部存储器。它会在写入闪存之前自动执行擦除命令，你可以使用`--no_erase`标志禁用自动擦除。其余的参数与`MCU Original Interface`的`fill-memory`命令相同。
 
 ```sh
 $ mboot fill -h
@@ -229,7 +228,7 @@ optional arguments:
 
 #### erase
 
-Subcommand `erase` can erase data in the flash, For external memory, you need to specify the `memory_id`, and you need to make sure the external memory has been set, you can quickly set it with the `--exconf` option. Note that when the option `--all` is turned on, the full-chip erase mode is entered. At this time, the erase `address` can be omitted. Otherwise, it should not be omitted. The default value of `length` is 0x100, but the actual erase may exceed this value because of the size of the block.
+子命令`erase`可以擦除闪存中的数据，对于外部存储器，需要指定`memory_id`，并且需要确保已设置外部存储器，可以使用`--exconf`选项快速设置它。注意，当选项`--all`打开时，进入全芯片擦除模式。此时，可以省略擦除`address`。否则，不应该省略。 `length`的默认值是0x100，但实际擦除时因为块的大小不同可能会超过此值。
 
 ```sh
 $ mboot erase -h
@@ -250,7 +249,7 @@ optional arguments:
 
 #### unlock
 
-Subcommand `unlock` is used to unlock MCU memory. I may support the jlink `unlock` command in the future.
+子命令`unlock`用于解锁MCU内存。我将来可能会支持jlink的`unlock`命令。
 
 ```sh
 $ mboot unlock -h
@@ -264,7 +263,7 @@ optional arguments:
 
 #### reset
 
-Currently it is no different from the `reset` command of `MCU original Interface`.
+目前它与`MCU original Interface`的`reset`命令没有什么不同。
 
 ```sh
 $ mboot reset -h
@@ -274,13 +273,13 @@ optional arguments:
   -h, --help  Show this help message and exit.
 ```
 
-[Here](doc/usage_example.md#MCU%20Boot%20User%20Interface) are some examples.
+[这里](doc/usage_example.md#MCU%20Boot%20User%20Interface)有一些具体实例。
 
 #### MCU Boot Original Interface
 
-For the use of `MCU Boot Original Interface`, please refer to [MCU Bootloader Reference Manual](https://www.nxp.com/docs/en/reference-manual/MCUBOOTRM.pdf). The difference is that `blhost` uses `--` as a separator and `mboot` uses `-o`. Of course, the type of the current peripheral is specified differently, `mboot` use `-s`, `-i` to express `spi` and `i2c`. You can also use `-h` to view help, it will print `docstring` directly.
+有关`MCU Boot Original Interface`的使用，请参阅[MCU Bootloader参考手册](https://www.nxp.com/docs/en/reference-manual/MCUBOOTRM.pdf）。区别在于`blhost`使用`--`作为分隔符，而`mboot`使用`-o`。当然，指定当前外围设备的类型不同，`mboot`使用`-s`，`-i`来表达`spi`和`i2c`。你也可以使用`-h`来查看帮助，它会直接打印`docstring`。
 
-[Here](doc/usage_example.md#MCU%20Boot%20Original%20Interface) are some examples.
+[这里](doc/usage_example.md#MCU%20Boot%20User%20Interface)有一些具体实例。
 
 
 

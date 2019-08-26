@@ -501,7 +501,7 @@ def main():
         cmd.debug += 1
     logging.basicConfig(level=log_level[cmd.debug])
 
-    print(cmd)
+    # print(cmd)
 
     mb = mboot.McuBoot()
     mb.cli_mode = True  # this is cli mode
