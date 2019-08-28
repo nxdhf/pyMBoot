@@ -191,7 +191,7 @@ else:
             super().__init__()
             self.ep_out = None
             self.ep_in = None
-            self.dev = None
+            self.device = None
             self.closed = False
 
         def open(self):
@@ -203,8 +203,8 @@ else:
             logging.debug("Close USB Interface")
             self.closed = True
             try:
-                if self.dev:
-                    usb.util.dispose_resources(self.dev)
+                if self.device:
+                    usb.util.dispose_resources(self.device)
             except:
                 pass
 
@@ -225,7 +225,7 @@ else:
                 bmRequest = 0x09           #Set_REPORT (HID class-specific request for transferring data over EP0)
                 wValue = 0x200             #Issuing an OUT report
                 wIndex = self.intf_number  #Interface number for HID
-                self.dev.ctrl_transfer(bmRequestType, bmRequest, wValue + id, wIndex, rawdata)
+                self.device.ctrl_transfer(bmRequestType, bmRequest, wValue + id, wIndex, rawdata)
 
         def read(self, timeout=1000, locate=None):
             """
@@ -307,7 +307,7 @@ else:
                 new_target = RawHID()
                 new_target.ep_in = ep_in
                 new_target.ep_out = ep_out
-                new_target.dev = dev
+                new_target.device = dev
                 new_target.vid = vid
                 new_target.pid = pid
                 new_target.intf_number = interface_number
