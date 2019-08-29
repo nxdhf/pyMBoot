@@ -34,7 +34,7 @@ you can also install the latest version of it manually by cloning:
 pip3 install -U https://github.com/nxdhf/pyMBoot/archive/master.zip
 ```
 
-In case of development, It is recommended to use a virtual environment, install it from cloned github sources:
+In case of development, It is recommended to use a virtual environment(Because the package installed with '-e' has problems on unbuntu that cannot be uninstalled), install it from cloned github sources:
 
 ```sh
 $ git clone https://github.com/nxdhf/pyMBoot
@@ -44,7 +44,7 @@ $ pipenv shell
 $ pip3 install -e .
 ```
 
-Sometimes the user directory may not be added to `PATH`, so there are problems with its CLI functionality. For this, please refer to
+Note that it is recommended to install with root privileges on Linux, so that it will be installed in the global directory instead of the user directory. If you do not install it with root privileges, you may need to manually add the user directory to the `$PATH`, otherwise you will get an error when using the command line. In order to solve this problem, please refer to
 [usage problem](doc/usage_problem.md#Installation%20was%20successful%20but%20the%20CLI%20prompt%20mboot%20command%20was%20not%20found?)
 
 In order to communicate with the device via `spi`, `i2c` protocol, you need a FTDI device as a bridge, For details, see [How to install libusb](doc/how_to_install_libusb.md)

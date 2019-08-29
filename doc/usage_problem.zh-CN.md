@@ -24,6 +24,15 @@ $ source ~/.bachrc
 ```
 windows下通常会全局安装，如果没有，请在`PATH`中添加用户目录，例如`C:\Users\Username\AppData\Roaming\Python36\Scripts`。
 
+### 出现"[Errno 13] xxx denied"的错误
+
+常见错误如下:
+
+* [Errno 13] Access denied (insufficient permissions)
+* [Errno 13] Permission denied: '/dev/ttyS0'
+
+这是由于权限不够所引起的，详细请参考[在linux中怎样省略sudo](how_to_omit_the_sudo_prefix_in_linux.zh-CN.md)
+
 ### 设备出错如何调试？
 
 使用`-d`选项你可以看到运行过程中执行了那些命令，而使用`-d 2`选项你可以看到总线上具体发送的数据，重启设备以避免上一个错误的影响，尤其对于`uart`设备来说。 
@@ -35,6 +44,17 @@ windows下通常会全局安装，如果没有，请在`PATH`中添加用户目�
 ### 能否同时插入两个具有相同`vid, pid`的设备？
 
 对于`uart`来说，这是可以的，因为自动搜索后会记录下用户选择设备的串口号，这是不会重复的，但对于其它外设来说，这是不行的，虽然仍然会弹出外设选择，但因为记录的是`vid, pid`，所以最终打开的设备会是第一个被发现的设备。
+
+### 在linux中读写串口有时会出错，但windows下正常？
+
+将会出现以下两个错误，同时出现一些mboot读写错误出现错误：
+
+* ERROR: read failed: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
+* ERROR: Attempting to use a port that is not open
+
+具体表现为重复运行命令，有时正常有时出现错误。
+
+该问题目前在`ubuntu 18.04`上存在，似乎是`kernel`版本的问题，详见[1](https://bugs.launchpad.net/ubuntu/+source/linux-lts-trusty/+bug/1501345)[2](https://bugs.launchpad.net/ubuntu/+source/python2.7/+bug/1501240)
 
 ### 为什么不使用`click`？
 

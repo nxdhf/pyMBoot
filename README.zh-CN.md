@@ -34,7 +34,7 @@ pip3 install mboot-*.whl
 pip3 install -U https://github.com/nxdhf/pyMBoot/archive/master.zip
 ```
 
-在开发的情况下，建议使用虚拟环境，通过克隆github源来安装它：
+在开发的情况下，建议使用虚拟环境(使用`-e`安装在`ubuntu`下存在无法删除的问题)，通过克隆github源来安装它：
 
 ```sh
 $ git clone https://github.com/nxdhf/pyMBoot
@@ -44,9 +44,9 @@ $ pipenv shell
 $ pip3 install -e .
 ```
 
-有时候用户目录可能没有添加到`PATH`中，所以其命令行功能会存在问题，关于这一点，请参考[usage_problem](doc/usage_problem.zh-CN.md#安装成功但运行时命令行提示没有找到mboot命令？)
+注意在linux上建议使用`root`权限安装，这样它就会被安装在全局目录而不是用户目录，如果你没有用`root`权限安装，你可能需要手动添加用户目录至`$PATH`，否则你使用命令行时会出现出错误，为了解决这个问题，请参考[使用问题](doc/usage_problem.zh-CN.md#安装成功但运行时命令行提示没有找到mboot命令？)
 
-为了通过`spi`，`i2c`协议与设备通信，你需要一个FTDI设备作为桥接器。有关详细信息，请参阅[How to install libusb](doc/how_to_install_libusb.zh-CN.md)
+为了通过`spi`，`i2c`协议与设备通信，你需要一个FTDI设备作为桥接器。有关详细信息，请参阅[怎样安装libusb](doc/how_to_install_libusb.zh-CN.md)
 
 ### mboot core
 

@@ -20,27 +20,6 @@
 $ apt install libusb-1.0
 ```
 
-然后，您需要创建一个udev配置文件，以允许用户空间进程访问FTDI设备。有很多方法可以配置udev，这是一个典型的设置：
-
-```
-# /etc/udev/rules.d/11-ftdi.rules
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6001", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6011", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6010", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6014", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6015", GROUP="plugdev", MODE="0666"
-```
-
-创建此文件后，您需要拔出/插回FTDI设备，以便udev加载匹配设备的规则。
-
-使用此设置，请务必将想要运行PyFtdi的用户添加到plugdev组，例如：
-
-```sh
-$ sudo adduser $USER plugdev
-```
-
-请记住，您需要注销/登录才能使上述命令生效。
-
 #### For windows
 
 请记住，如果您的目标设备不是HID，则必须先安装驱动程序，然后才能使用`libusb`与其进行通信。目前，这意味着安装一个Microsoft的`WinUSB`，`libusb-win32`或`libusbK`驱动程序。

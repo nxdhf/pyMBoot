@@ -20,27 +20,6 @@ You should install `libusb` first:
 $ sudo apt install libusb-1.0
 ```
 
-then you need to create a udev configuration file to allow user-space processes to access to the FTDI devices. There are many ways to configure udev, here is a typical setup:
-
-```
-# /etc/udev/rules.d/11-ftdi.rules
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6001", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6011", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6010", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6014", GROUP="plugdev", MODE="0666"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0403", ATTR{idProduct}=="6015", GROUP="plugdev", MODE="0666"
-```
-
-You need to unplug / plug back the FTDI device once this file has been created so that udev loads the rules for the matching device.
-
-With this setup, be sure to add users that want to run PyFtdi to the plugdev group, e.g.
-
-```sh
-$ sudo adduser $USER plugdev
-```
-
-Remember that you need to log out / log in to get the above command effective.
-
 #### For windows
 
 If your target device is not HID, you must install a driver before you can communicate with it using `libusb`. Currently, this means installing one of Microsoft's `WinUSB`, `libusb-win32` or `libusbK` drivers.
