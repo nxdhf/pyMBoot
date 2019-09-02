@@ -1,11 +1,11 @@
 from enum import Enum
 
 class Interface(int, Enum):
-    UART    = 0
-    I2C     = 1
-    SPI     = 2
-    CAN     = 3
-    USB     = 4
+    UART    = 1
+    I2C     = 2
+    SPI     = 3
+    CAN     = 4
+    USB     = 5
 
 class KeyOperation(int, Enum):
     enroll                  = 0

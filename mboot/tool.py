@@ -12,11 +12,11 @@ def size_fmt(value, use_kibibyte=True):
     :return:
     """
     base, suffix = [(1000., 'B'), (1024., 'iB')][use_kibibyte]
-    for x in ['B'] + [x + suffix for x in list('kMGTP')]:
+    for unit in ['B'] + [x + suffix for x in list('kMGTP')]:
         if -base < value < base:
             break
         value /= base
-    return "{0:3.1f} {1:s}".format(value, x)
+    return "{0:3.1f} {1:s}".format(value, unit)
 
 
 def atos(data, separator=' ', fmt='02X'):

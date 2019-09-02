@@ -10,7 +10,7 @@ import logging
 import struct
 
 # relative imports
-from .enums import CommandTag, PropertyTag, StatusCode
+from .enums import CommandTag, PropertyTag, StatusCode, ExtMemPropTags
 from .constant import Interface, KeyOperation
 from .tool import read_file, write_file, check_key, atos, size_fmt
 from .exception import McuBootGenericError, McuBootCommandError
@@ -26,8 +26,8 @@ from .decorator import clock
 # Helper functions
 ########################################################################################################################
 
-def decode_property_value(property_tag, raw_value, memory_id=None, last_cmd_response=None):
-    if property_tag == PropertyTag.CURRENT_VERSION:
+def decode_property_value(property_tag, raw_value, last_cmd_response=None, memory_id=None):
+    if property_tag in (PropertyTag.CURRENT_VERSION, PropertyTag.TARGET_VERSION):
         str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF, (raw_value >> 8) & 0xFF, raw_value & 0xFF)
 
     elif property_tag == PropertyTag.AVAILABLE_PERIPHERALS:
@@ -36,8 +36,41 @@ def decode_property_value(property_tag, raw_value, memory_id=None, last_cmd_resp
             if value[0] & raw_value:
                 str_value.append(key)
 
+    elif property_tag in (PropertyTag.CRC_CHECK_STATUS, PropertyTag.QSPI_INIT_STATUS,
+                          PropertyTag.RELIABLE_UPDATE_STATUS):
+        if raw_value in StatusCode:
+            str_value = StatusCode[raw_value]
+        else:
+            str_value = 'Unknown Status Code: 0x{:08X}'.format(raw_value)
+
+    elif property_tag == PropertyTag.VERIFY_WRITES:
+        str_value = 'ON' if raw_value else 'OFF'
+
+    elif property_tag == PropertyTag.RESERVED_REGIONS:
+        word_len = int((len(last_cmd_response) - 8) / 4)
+        result = struct.unpack_from('<{:d}I'.format(word_len), last_cmd_response, 8)
+        str_value = []
+        for i in range(0, len(result), 2):
+            block = MemoryBlock(result[i], result[i+1])
+            if block:
+                str_value.append(str(block))
+
+    elif property_tag == PropertyTag.UNIQUE_DEVICE_IDENT:
+        word_len = int((len(last_cmd_response) - 8) / 4)
+        result = struct.unpack_from('<{:d}I'.format(word_len), last_cmd_response, 8)
+        str_list = ['{:08X}'.format(value) for value in result]
+        str_value = ' '.join(str_list)
+        # str_value = '{:04X} {:04X} '.format((raw_value >> 16) & 0xFFFF, raw_value & 0xFFFF)
+
+    elif property_tag == PropertyTag.FLASH_FAC_SUPPORT:
+        str_value = 'SUPPORTED' if raw_value else 'UNSUPPORTED'
+
     elif property_tag == PropertyTag.FLASH_SECURITY_STATE:
-        str_value = 'Unlocked' if raw_value == 0 else 'Locked'
+        security_state = {0x00000000: 'Unlocked', 0x00000001: 'Locked', 0x5AA55AA5: 'Unlocked', 0xC33CC33C: 'Locked'}
+        if raw_value in security_state:
+            str_value = security_state[raw_value]
+        else:
+            str_value = "Unknown (0x{:08X})".format(raw_value)
 
     elif property_tag == PropertyTag.AVAILABLE_COMMANDS:
         str_value = []
@@ -46,24 +79,66 @@ def decode_property_value(property_tag, raw_value, memory_id=None, last_cmd_resp
                 str_value.append(name)
 
     elif property_tag in (PropertyTag.MAX_PACKET_SIZE, PropertyTag.FLASH_SECTOR_SIZE,
-                          PropertyTag.FLASH_SIZE, PropertyTag.RAM_SIZE):
+                          PropertyTag.FLASH_SIZE, PropertyTag.RAM_SIZE, PropertyTag.FLASH_ACCESS_SEGMENT_SIZE):
         str_value = size_fmt(raw_value)
 
     elif property_tag in (PropertyTag.RAM_START_ADDRESS, PropertyTag.FLASH_START_ADDRESS,
                           PropertyTag.SYSTEM_DEVICE_IDENT):
         str_value = '0x{:08X}'.format(raw_value)
-    
+
+    elif property_tag in (PropertyTag.FLASH_ACCESS_SEGMENT_COUNT, PropertyTag.FLASH_BLOCK_COUNT,
+                          PropertyTag.VALIDATE_REGIONS):
+        str_value = '0x{:X}'.format(raw_value)
+
+    elif property_tag == PropertyTag.FLASH_READ_MARGIN:
+        margin_info = {0: "Normal", 1: "User", 2: "Factory"}
+        if raw_value in margin_info:
+            str_value = "{} (0x{:X})".format(margin_info[raw_value], raw_value)
+        else:
+            str_value = "Unknown (0x{:X})".format(raw_value)
+
     elif property_tag == PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES and memory_id:
-        # start_address, total_size, _, _, block_size
-        result = struct.unpack_from('<5L', last_cmd_response, 12) # upack(<'4B7L',last_cmd_response)
-        start_address, total_size, _, _, block_size = result
-        str_value = ''' External Memory Attributes:
-                    Memory Id: 0x{:X}
-                    Start Address: 0x{:08X}
-                    Total Size: 0x{:08X} KB = {:5.3f} GB
-                    Block Size: 0x{:X} Bytes'''.format(memory_id, result[0], result[1], result[1]/1024/1024, result[4])
+
+        result = struct.unpack_from('<6I', last_cmd_response, 8)
+        prop_tags, start_address, total_size, page_size, sector_size, block_size = result
+        str_value = []
+        str_value.append('Memory Id: 0x{:X}'.format(memory_id))
+        if prop_tags & ExtMemPropTags.START_ADDRESS:
+            str_value.append('Start Address: 0x{:08X}'.format(start_address))
+
+        if prop_tags & ExtMemPropTags.SIZE_IN_KBYTES:
+            str_value.append('Total Size: {}'.format(size_fmt(total_size * 1024)))
+
+        if prop_tags & ExtMemPropTags.PAGE_SIZE:
+            str_value.append('Page Size: {}'.format(size_fmt(page_size)))
+
+        if prop_tags & ExtMemPropTags.SECTOR_SIZE:
+            str_value.append('Sector Size: {}'.format(size_fmt(sector_size)))
+
+        if prop_tags & ExtMemPropTags.BLOCK_SIZE:
+            str_value.append('Block Size: {}'.format(size_fmt(block_size)))
+
+    elif property_tag == PropertyTag.IRQ_NOTIFIER_PIN:
+        pin = raw_value & 0xFF
+        port = (raw_value >> 8) & 0xFF
+        enabled = True if raw_value & (1 << 32) else False
+        if enabled:
+            str_value = "Irq pin is enabled, using GPIO port[{}], pin[{}]".format(port, pin)
+        else:
+            str_value = "Irq pin is disabled"
+
+    elif property_tag == PropertyTag.PFR_KEYSTORE_UPDATE_OPT:
+        str_value = "FFR KeyStore Update is "
+
+        if raw_value == 0:
+            str_value += "Key Provisioning"
+        elif raw_value == 1:
+            str_value += "Write Memory"
+        else:
+            str_value += "UnKnow Option"
+
     else:
-        str_value = '{:d}'.format(raw_value)
+        str_value = '0x{:X}'.format(raw_value)
 
     return str_value
 
@@ -287,7 +362,7 @@ class McuBoot(object):
     def is_in_flash(self, block):
         return block in self.flash if self.flash else True
 
-    def get_mcu_info(self):
+    def get_mcu_info(self, memory_id=0):
         """ MCUBoot: Get MCU info (available properties collection)
         :return List of {dict}
         """
@@ -299,7 +374,7 @@ class McuBoot(object):
         for property_name, property_tag, _ in PropertyTag:
             try:
                 raw_value = self.get_property(property_tag)
-                str_value = decode_property_value(property_tag, raw_value)
+                str_value = decode_property_value(property_tag, raw_value, self._itf_.last_cmd_response, memory_id)
             except McuBootCommandError:
                 continue
             mcu_info.update({property_name: str_value})
@@ -307,14 +382,18 @@ class McuBoot(object):
         return mcu_info
 
     def get_exmemory_info(self, memory_id):
+        '''Use special tag EXTERNAL_MEMORY_ATTRIBUTES(0x19) to get information about external memory'''
+        exmem_info = {}
         try:
             raw_value = self.get_property(PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES, memory_id)
-            str_value = decode_property_value(PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES, raw_value, memory_id, self._itf_.last_cmd_response)
+            str_value = decode_property_value(PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES, raw_value, self._itf_.last_cmd_response, memory_id)
         except McuBootCommandError:
             pass
-        str_list = [' ' + value.strip() for value in str_value.split('\n')]
-        str_value = '\n '.join(str_list)
-        return str_value
+        # str_list = [' External Memory Attributes:']
+        # str_list.extend([' ' + value.strip() for value in str_value.split('\n')])
+        # str_value = '\n '.join(str_list)
+        exmem_info.update({'External Memory Attributes': str_value})
+        return exmem_info
 
     def setup_external_memory(self, memory_id, exconf):
         start_config_address = fill_config_address = exconf[0]
@@ -472,12 +551,13 @@ class McuBoot(object):
         #     cmd = struct.pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
         # else:
         #     cmd = struct.pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memoryId)
+        # print(CommandTag.GET_PROPERTY[prop_tag])
         cmd = struct.pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, memory_id)
         # Process FillMemory command
         raw_value = self._itf_.write_cmd(cmd)
 
         logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, 
-            raw_value, memory_id, self._itf_.last_cmd_response))
+            raw_value, self._itf_.last_cmd_response, memory_id))
         return raw_value
 
     def set_property(self, prop_tag, value, memory_id = 0):

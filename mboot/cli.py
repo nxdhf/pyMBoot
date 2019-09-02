@@ -66,7 +66,13 @@ def info(mb, memory_id=0, exconf=None):
         if exconf:
             mb.setup_external_memory(memory_id, exconf)
         info = mb.get_exmemory_info(memory_id)
-        print(info)
+        for key, value in info.items():
+            m = " {}:".format(key)
+            if isinstance(value, list):
+                m += "".join(["\n  - {}".format(s) for s in value])
+            else:
+                m += "\n  = {}".format(value)
+            print(m)
 
 def write(mb, address, filename, memory_id=0, offset=0, no_erase=False, exconf=None):
     do_erase = not no_erase
@@ -440,7 +446,7 @@ def main():
     subparsers = parser.add_subparsers(title='MCU Boot User Interface', prog='mboot [options]')
     
     parser_info = subparsers.add_parser('info', help='Get MCU info (mboot properties)', formatter_class=MBootSubHelpFormatter, add_help=False)
-    parser_info.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x010, 0x100, 0x101, 0x110, 0x120, 0x121), 
+    parser_info.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x0a, 0x010, 0x100, 0x101, 0x110, 0x111, 0x120, 0x121), 
         help='External memory id, Display external memory information if it is already executed configure-memory', metavar='memory_id')
     parser_info.add_argument('-e', '--exconf', nargs='*', type=check_int, help='Set external memory address and settings, '
         'such as "fill_config_address config_word1 [config_word2 [...]]", only the first time you need to set')
@@ -450,7 +456,7 @@ def main():
     parser_write.add_argument('address', type=check_int, nargs='?', help='Start address, '
         'the arg can be omitted if file end with ".srec", ".s19", ".hex", ".ihex" that contains the address')
     parser_write.add_argument('filename', help='File to be written')
-    parser_write.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x010, 0x100, 0x101, 0x110, 0x120, 0x121), 
+    parser_write.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x0a, 0x010, 0x100, 0x101, 0x110, 0x111, 0x120, 0x121), 
         help='External memory id', metavar='memory_id')
     parser_write.add_argument('-o', '--offset', type=check_int, default=0, help='File offset address')
     parser_write.add_argument('--no_erase', action='store_true', help='Do not automatically erase before writing.')
@@ -463,7 +469,7 @@ def main():
     parser_read.add_argument('length', type=check_int, default=0x100, help='Read data length')
     parser_read.add_argument('filename', nargs='?', help='File to be written')
     parser_read.add_argument('memory_id', nargs='?', type=check_int, action=FixArgValue, check_arg='filename', default=0, 
-        choices=(0, 0x1, 0x8, 0x9, 0x010, 0x100, 0x101, 0x110, 0x120, 0x121), help='External memory id', metavar='memory_id')
+        choices=(0, 0x1, 0x8, 0x9, 0x0a, 0x010, 0x100, 0x101, 0x110, 0x111, 0x120, 0x121), help='External memory id', metavar='memory_id')
     parser_read.add_argument('-c', '--compress', action='store_true', help='Compress dump output.')
     parser_read.add_argument('-e', '--exconf', nargs='*', type=check_int, help='Set external memory address and settings, '
         'such as "fill_config_address config_word1 [config_word2 [...]]", only the first time you need to set')
@@ -481,7 +487,7 @@ def main():
     parser_erase = subparsers.add_parser('erase', help='Erase MCU memory', formatter_class=MBootSubHelpFormatter, add_help=False)
     parser_erase.add_argument('address', nargs='?', type=check_int, help='Start address')
     parser_erase.add_argument('length', nargs='?', type=check_int, default=0x100, help='Erase data length')
-    parser_erase.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x010, 0x100, 0x101, 0x110, 0x120, 0x121), 
+    parser_erase.add_argument('memory_id', nargs='?', type=check_int, default=0, choices=(0, 0x1, 0x8, 0x9, 0x0a, 0x010, 0x100, 0x101, 0x110, 0x111, 0x120, 0x121), 
         help='External memory id', metavar='memory_id')
     parser_erase.add_argument('-a', '--all', action='store_true', help='Erase complete MCU memory')
     parser_erase.add_argument('-e', '--exconf', nargs='*', type=check_int, help='Set external memory address and settings, '

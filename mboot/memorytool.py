@@ -24,7 +24,10 @@ class MemoryBlock(object):
         return self.length
 
     def __str__(self):
-        return '{} start:{:#010x} end:{:#010x} length: {:#010x} @{}'.format(self.__class__.__name__,
+        return 'region: 0x{:08X}-0x{:08X} (len: 0x{:08X})'.format(self.start, self.end, self.length)
+
+    def __repr__(self):
+        return '{} start: 0x{:08X} end: 0x{:08X} length: 0x{:08X} @{}'.format(self.__class__.__name__,
             self.start, self.end, self.length, id(self))
 
     def __eq__(self, other):
