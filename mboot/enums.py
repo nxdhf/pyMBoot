@@ -36,12 +36,16 @@ class CommandTag(Enum):
     KEY_PROVISIONING = (0x15, 'KeyProvisioning', 'Key Provisioning')
     Flash_IMAGE = (0x16, 'FlashImage', 'Flash Image')
 
-    GENERIC_RESPONSE = (0xA0, 'GenericResponse', 'Generic Response')
-    FLASH_READ_ONCE_RESPONSE = (0xAF, 'FlashReadOnceResponse', 'Flash Read Once Response')
-    FLASH_READ_RESOURCE_RESPONSE = (0xB0, 'FlashReadResourceResponse', 'Flash Read Resource Response')
-    GENERATE_KEY_BLOB_RESPONSE = (0xB3, 'GenerateKeyBlobResponse', 'Generate Key Blob Response')
-    KEY_PROVISIONING_RESPONSE = (0xB5, 'KeyProvisionResponse', 'Key Provision Response')
+    # reserved commands
+    CONFIGURE_I2C = (0xC1, 'ConfigureI2c', 'Configure I2C')
+    CONFIGURE_SPI = (0xC2, 'ConfigureI2c', 'Configure SPI')
+    CONFIGURE_CAN = (0xC3, 'ConfigureCan', 'Configure CAN')
 
+    # GENERIC_RESPONSE = (0xA0, 'GenericResponse', 'Generic Response')
+    # FLASH_READ_ONCE_RESPONSE = (0xAF, 'FlashReadOnceResponse', 'Flash Read Once Response')
+    # FLASH_READ_RESOURCE_RESPONSE = (0xB0, 'FlashReadResourceResponse', 'Flash Read Resource Response')
+    # GENERATE_KEY_BLOB_RESPONSE = (0xB3, 'GenerateKeyBlobResponse', 'Generate Key Blob Response')
+    # KEY_PROVISIONING_RESPONSE = (0xB5, 'KeyProvisionResponse', 'Key Provision Response')
 
 ########################################################################################################################
 # McuBoot Properties Tag
@@ -104,6 +108,10 @@ class StatusCode(Enum):
     FLASH_PROTECTION_VIOLATION = (104, 'FlashProtectionViolation', 'FLASH Driver: Protection Violation')
     FLASH_COMMAND_FAILURE = (105, 'FlashCommandFailure', 'FLASH Driver: Command Failure')
     FLASH_UNKNOWN_PROPERTY = (106, 'FlashUnknownProperty', 'FLASH Driver: Unknown Property')
+    FLASH_REGION_EXECUTE_ONLY = (108, 'FlashRegionExecuteOnly', 'FLASH Driver: Region Execute Only')
+    FLASH_EXEC_IN_RAM_NOT_READY = (109, 'FlashExecuteInRamFunctionNotReady','FLASH Driver: Execute In Ram Function Not Ready')
+    FLASH_COMMAND_NOT_SUPPORTED = (111, 'FlashCommandNotSupported', 'FLASH Driver: Command Not Supported')
+    FLASH_OUT_OF_DATE_CFPA_PAGE = (132, 'FlashOutOfDateCfpaPage', 'FLASH Driver: Out Of Date CFPA Page')
 
     # I2C driver errors.
     I2C_SLAVE_TX_UNDERRUN = (200, 'I2cSlaveTxUnderrun', 'I2C Driver: Slave Tx Underrun')
@@ -122,6 +130,16 @@ class StatusCode(Enum):
     QSPI_FLASH_UNKNOWN_PROPERTY = (404, 'QspiFlashUnknownProperty', 'QSPI Driver: Flash Unknown Property')
     QSPI_NOT_CONFIGURED = (405, 'QspiNotConfigured', 'QSPI Driver: Not Configured')
     QSPI_COMMAND_NOT_SUPPORTED = (406, 'QspiCommandNotSupported', 'QSPI Driver: Command Not Supported')
+    QSPI_COMMAND_TIMEOUT = (407, 'QspiCommandTimeout', 'QSPI Driver: Command Timeout')
+    QSPI_WRITE_FAILURE = (408, 'QspiWriteFailure', 'QSPI Driver: Write Failure')
+
+    # OTFAD driver errors.
+    OTFAD_SECURITY_VIOLATION = (500, 'OtfadSecurityViolation', 'OTFAD Driver: Security Violation')
+    OTFAD_LOGICALLY_DISABLED = (501, 'OtfadLogicallyDisabled', 'OTFAD Driver: Logically Disabled')
+    OTFAD_INVALID_KEY = (502, 'OtfadInvalidKey', 'OTFAD Driver: Invalid Key')
+    OTFAD_INVALID_KEY_BLOB = (503, 'OtfadInvalidKeyBlob', 'OTFAD Driver: Invalid Key Blob')
+
+    # SDMMC driver errors.
 
     # Bootloader errors.
     UNKNOWN_COMMAND = (10000, 'UnknownCommand', 'Unknown Command')
@@ -189,3 +207,38 @@ class StatusCode(Enum):
 
     # Reliable update errors.
     RELIABLE_UPDATE_SUCCESS = (10600, 'ReliableUpdateSuccess', 'Reliable Update Success')
+
+########################################################################################################################
+# McuBoot Memory ID
+########################################################################################################################
+
+class ExtMemId(Enum):
+    """ McuBoot External Memory Property Tags """
+
+    QUAD_SPI0 = (1, 'QuadSPI', 'Quad SPI Memory 0')     #0x001
+    # IFR0 = (4, 'Nonvolatile information register 0 (only used by SB loader)')
+    SEMC_NOR = (8, 'SEMC NOR Memory')           #0x008
+    FLEX_SPI_NOR = (9, 'Flex SPI NOR Memory')   #0x009
+    SPIFI_NOR = (10, 'SPIFI NOR Memory')        #0x00a
+    FLASH_EXECUTE_ONLY = (16, 'Execute-Only region on internal Flash')  #0x010
+    SEMC_NAND = (256, 'SEMC NAND Memory')               #0x100
+    SPI_NAND = (257, 'SPI NAND Memory')                 #0x101
+    SPI_NOR_EEPROM = (272, 'SPI NOR/EEPROM Memory')     #0x100
+    I2C_NOR_EEPROM = (273, 'I2C NOR/EEPROM Memory')     #0x111
+    SD_CARD = (288, 'eSD, SD, SDHC, SDXC Memory Card')  #0x120
+    MMC_CARD = (289, 'MMC, eMMC Memory Card')           #0x121
+
+
+########################################################################################################################
+# McuBoot External Memory Property Tags
+########################################################################################################################
+
+class ExtMemPropTags(Enum):
+    """ McuBoot External Memory Property Tags """
+
+    INIT_STATUS = 0x00000000
+    START_ADDRESS = 0x00000001
+    SIZE_IN_KBYTES = 0x00000002
+    PAGE_SIZE = 0x00000004
+    SECTOR_SIZE = 0x00000008
+    BLOCK_SIZE = 0x00000010
