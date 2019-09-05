@@ -244,14 +244,26 @@ class McuBoot(object):
         else:
             return False
 
-    def open_usb(self, vid_pid):
+    def open_usb(self, vid_pid, path=None):
         """ MCUBoot: Connect by USB
+        :param vid_pid: Device vid and pid, support str or tuple, such as 'vid pid', (vid, pid)
+        :param path: You need to specify additional paths when you insert two devices with the same vid, PID at the same time,
+        on linux: 'Bus 000 Address 005', on windows: the value of bus relations, such as '6&28e6394a&0&0000',
+        This function is not involved in library function calls, it is used in cli mode
+        :return The result of opening the device
         """
         if isinstance(vid_pid, str):
             _vid_pid = parse_port(Interface.USB.name, vid_pid)
         else:   # Default input tuple in cli mode, no conversion required
-            _vid_pid = vid_pid
-        dev = RawHID.enumerate(*_vid_pid)
+            if len(vid_pid) == 2:
+                _vid_pid = vid_pid
+            elif len(vid_pid) == 3 and path is None:
+                path = vid_pid[-1]
+                _vid_pid = vid_pid[:2]
+            else:
+                raise ValueError('vid_pid input error!')
+
+        dev = RawHID.enumerate(*_vid_pid, path)
         if len(dev) == 1:
             logging.info('Connect: %s', dev[0].info())
             self._itf_ = dev[0] # Already open, simple assignment
@@ -260,9 +272,9 @@ class McuBoot(object):
             self.reopen_args = vid_pid
             return True
         elif len(dev) > 1:
-            raise McuBootGenericError("Can't insert two devices with the same vid, PID at the same time")
+            raise McuBootGenericError("You need to specify additional paths when you insert two devices with the same vid, PID at the same time")
         else:
-            info = 'Can not find vid,pid: 0x{p[0]:04X}, {p[1]:04X}'.format(p=_vid_pid)
+            info = 'Can not find vid,pid: 0x{p[0]:04X}, 0x{p[1]:04X}'.format(p=_vid_pid)
             if self.cli_mode:   # Fast failure in cli mode
                 raise McuBootGenericError(info)
             logging.info(info)

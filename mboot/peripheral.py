@@ -9,7 +9,6 @@ DEVICES = {
     'MKL27': (0x15A2, 0x0073),
     'LPC55': (0x1FC9, 0x0021),
     'K82F' : (0x15A2, 0x0073),
-    # '232h' : (0x403,0x6014),
     'KE16Z': (0x0D28, 0x0204),  # uart
     'FPGA' : (0x1A86, 0x7523)   # uart
 }
@@ -109,11 +108,12 @@ def scan_usb():
             print(' {0:d}) {1:s}'.format(i, device.info()))
         c = input('\n Select: ')
         index = int(c, 10)
-    product_name = devices[index].product_name
-    vid_pid = (devices[index].vid, devices[index].pid)
-    for device in devices:
-        device.close()
-    return product_name, vid_pid
+    desc = devices[index].desc
+    vid_pid = (devices[index].vid, devices[index].pid, devices[index].path)
+    # for device in devices:
+    #     device.close()
+    # print(' DEVICE: {0:s} (0x{p[0]:04X}, 0x{p[1]:04X}) {1:d} @ {2}'.format(desc, speed, device.path, p=port))
+    return desc, vid_pid
 
 def scan_uart():
     all_devices = serial.tools.list_ports.comports()
@@ -135,10 +135,10 @@ def scan_uart():
         choose = input('\n Select: ')
         index = int(choose, 10)
     selected_device = possible_device[index]
-    product_name = '{d.manufacturer:s} {d.description:s}'.format(
+    desc = '{d.manufacturer:s} {d.description:s}'.format(
         d = selected_device).rsplit(' (', 1)[0]
     port = selected_device.device  # port or (vid, pid)
-    return product_name, port
+    return desc, port
 
 def scan_spi():
     value = set(FTDI.values())
@@ -152,7 +152,7 @@ def scan_spi():
             print(info)
         c = input('\n Select: ')
         index = int(c, 10)
-    *vid_pid, _, _, product_name = devices[index]
-    return product_name, tuple(vid_pid)
+    *vid_pid, _, _, desc = devices[index]
+    return desc, tuple(vid_pid)
 
 scan_i2c = scan_spi

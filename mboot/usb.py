@@ -24,6 +24,8 @@ class RawHidBase(object):
     def __init__(self):
         self.vid = 0
         self.pid = 0
+        self.path = ''
+        self.desc = ''
         self.vendor_name = ""
         self.product_name = ""
 
@@ -45,7 +47,7 @@ class RawHidBase(object):
         raise NotImplementedError()
 
     def info(self):
-        return "{0:s} (0x{1:04X}, 0x{2:04X})".format(self.product_name, self.vid, self.pid)
+        return "{0:s} (0x{1:04X}, 0x{2:04X}) @ {3}".format(self.desc, self.vid, self.pid, self.path)
 
     def write(self, id, data, size):
         raise NotImplementedError()
@@ -130,7 +132,7 @@ if os.name == "nt":
             # return bytes(rawdata)
 
         @staticmethod
-        def enumerate(vid, pid):
+        def enumerate(vid, pid, path=None):
             """
             returns all the connected devices which matches PyWinUSB.vid/PyWinUSB.pid.
             returns an array of PyWinUSB (Interface) objects
@@ -151,14 +153,18 @@ if os.name == "nt":
                     dev.open(shared=False)
                     report = dev.find_output_reports()
                     dev.close()
-
+                    # Specify additional path to search.
+                    if path is not None and path != dev.device_path.split('#')[-2]:
+                            continue
                     if report:
                         new_target = RawHID()
                         new_target.report = report
                         new_target.vendor_name = dev.vendor_name
                         new_target.product_name = dev.product_name
+                        new_target.desc = dev.vendor_name[:-1]
                         new_target.vid = dev.vendor_id
                         new_target.pid = dev.product_id
+                        new_target.path = dev.device_path.split('#')[-2]
                         new_target.device = dev
                         new_target.device.set_raw_data_handler(new_target.__rx_handler)
                         targets.append(new_target)
@@ -241,7 +247,7 @@ else:
             return self._decode_packet(rawdata)
 
         @staticmethod
-        def enumerate(vid, pid):
+        def enumerate(vid, pid, path=None):
             """
             returns all the connected devices which matches PyUSB.vid/PyUSB.pid.
             returns an array of PyUSB (Interface) objects
@@ -259,6 +265,12 @@ else:
 
             # iterate on all devices found
             for dev in all_devices:
+                # Specify additional path to search.
+                if path is not None:
+                    _, bus, _, address = path.split(' ')
+                    if not (int(bus) == dev.bus and int(address) == dev.address):
+                        continue
+
                 interface = None
                 interface_number = -1
 
@@ -313,6 +325,8 @@ else:
                 new_target.intf_number = interface_number
                 new_target.vendor_name = vendor_name
                 new_target.product_name = product_name
+                new_target.desc = product_name
+                new_target.path = 'Bus {:03d} Address {:03d}'.format(dev.bus, dev.address)
                 targets.append(new_target)
 
             return targets
