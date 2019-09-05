@@ -11,6 +11,7 @@ from .memorytool import MemoryBlock
 from .peripheral import parse_peripheral
 from .exception import McuBootGenericError
 from . import global_error_handler
+from . import __version__
 
 # Use when debugging the argprase library, because the command has not been received 
 # at this time to set the log level, so there will be no more detailed details.
@@ -439,7 +440,7 @@ def main():
     parser.add_argument('-d', '--debug', nargs='?', type=int, choices=range(0, 3), const=1, default=0, help='Debug level: 0-off, 1-info, 2-debug')
     parser.add_argument('-o', '--origin', nargs=argparse.REMAINDER, help='MCU Boot Original Interface')
     parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s 1.0', help="Show program's version number and exit.")
+    parser.add_argument('-v', '--version', action='version', version='%(prog)s {}'.format(__version__), help="Show program's version number and exit.")
     # requiredNamed = parser.add_argument_group('required named arguments')
     # requiredNamed.add_argument('-info', action='store_true', help='Get MCU info (mboot properties)')
 
@@ -552,7 +553,7 @@ def main():
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
         write(mb, args.address, args.filename, args.memory_id, args.offset, args.no_erase, args.exconf)
-        print(" Wrote Successfully.")
+        print(" Write Successfully.")
 
     if cmd.read:
         args = cmd.read
@@ -565,7 +566,7 @@ def main():
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
         fill(mb, args.address, args.byte_count, args.pattern, args.unit, args.no_erase)
-        print(" Filled Successfully.")
+        print(" Fill Successfully.")
 
     if cmd.erase:
         args = cmd.erase
@@ -574,20 +575,21 @@ def main():
         if args.address is None and not args.all:
             raise McuBootGenericError('If you do not use the full-chip erase mode, you must enter the erase address.')
         erase(mb, args.address, args.length, args.memory_id, args.all, args.exconf)
-        print(" Erased Successfully.")
+        print(" Erase Successfully.")
 
     if cmd.unlock:
         args = cmd.unlock
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
         unlock(mb, args.key)
-        print(" Unlocked Successfully.")
+        print(" Unlock Successfully.")
 
     if cmd.reset:
-        mb.reset()
+        args = cmd.reset
         if getattr(args, '_unrecognized_args', None):
             raise McuBootGenericError('invalid arguments:{}'.format(args._unrecognized_args))
-        print(' Reset OK')
+        mb.reset()
+        print(' Reset Successfully.')
 
     if cmd.origin:
         mb.timeout = cmd.timeout or mb.timeout
