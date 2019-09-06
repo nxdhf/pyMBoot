@@ -4,13 +4,19 @@ import pyftdi
 from .usb import RawHID
 from .exception import McuBootGenericError, McuBootConnectionError
 
-DEVICES = {
-    # NAME   | VID   | PID
-    'MKL27': (0x15A2, 0x0073),
-    'LPC55': (0x1FC9, 0x0021),
-    'K82F' : (0x15A2, 0x0073),
-    'KE16Z': (0x0D28, 0x0204),  # uart
-    'FPGA' : (0x1A86, 0x7523)   # uart
+# DEVICES = {
+#     # NAME   | VID   | PID
+#     'MKL27': (0x15A2, 0x0073),
+#     'LPC55': (0x1FC9, 0x0021),
+#     'K82F' : (0x15A2, 0x0073),
+#     'KE16Z': (0x0D28, 0x0204),  # uart
+#     'FPGA' : (0x1A86, 0x7523)   # uart
+# }
+
+USB_DEV = {
+    #   VID | PID
+    (0x15A2, None), 
+    (0x1FC9, None)
 }
 
 UART_DEV = {
@@ -101,7 +107,7 @@ def parse_peripheral(peripheral, args):
 
 def scan_usb():
     devices = []
-    for value in set(DEVICES.values()):
+    for value in USB_DEV:
         # print(name, value[0], value[1])
         devices += RawHID.enumerate(value[0], value[1])
     if not devices:

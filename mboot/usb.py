@@ -132,7 +132,7 @@ if os.name == "nt":
             # return bytes(rawdata)
 
         @staticmethod
-        def enumerate(vid, pid, path=None):
+        def enumerate(vid, pid=None, path=None):
             """
             returns all the connected devices which matches PyWinUSB.vid/PyWinUSB.pid.
             returns an array of PyWinUSB (Interface) objects
@@ -144,7 +144,9 @@ if os.name == "nt":
             # find devices with good vid/pid
             all_kboot_devices = []
             for d in all_devices:
-                if (d.vendor_id == vid) and (d.product_id == pid):
+                if pid is None and d.vendor_id == vid:
+                    all_kboot_devices.append(d)
+                elif d.vendor_id == vid and d.product_id == pid:
                     all_kboot_devices.append(d)
 
             targets = []
@@ -247,7 +249,7 @@ else:
             return self._decode_packet(rawdata)
 
         @staticmethod
-        def enumerate(vid, pid, path=None):
+        def enumerate(vid, pid=None, path=None):
             """
             returns all the connected devices which matches PyUSB.vid/PyUSB.pid.
             returns an array of PyUSB (Interface) objects
@@ -255,7 +257,10 @@ else:
             :param pid:
             """
             # find all devices matching the vid/pid specified
-            all_devices = usb.core.find(find_all=True, idVendor=vid, idProduct=pid)
+            if pid is None:
+                all_devices = usb.core.find(find_all=True, idVendor=vid)
+            else:
+                all_devices = usb.core.find(find_all=True, idVendor=vid, idProduct=pid)
 
             if not all_devices:
                 logging.debug("No device connected")
@@ -320,8 +325,8 @@ else:
                 new_target.ep_in = ep_in
                 new_target.ep_out = ep_out
                 new_target.device = dev
-                new_target.vid = vid
-                new_target.pid = pid
+                new_target.vid = dev.idVendor
+                new_target.pid = dev.idProduct
                 new_target.intf_number = interface_number
                 new_target.vendor_name = vendor_name
                 new_target.product_name = product_name
