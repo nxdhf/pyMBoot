@@ -13,6 +13,10 @@ DEVICES = {
     'FPGA' : (0x1A86, 0x7523)   # uart
 }
 
+UART_DEV = {
+    (0x0D28, None)
+}
+
 FTDI = {
     '232'       : (0x0403, 0x6001),
     '232r'      : (0x0403, 0x6001),
@@ -117,26 +121,35 @@ def scan_usb():
 
 def scan_uart():
     all_devices = serial.tools.list_ports.comports()
+    if not all_devices:
+        raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
     device_list = [device for device in all_devices if device.vid and device.pid]
 
     possible_device = []
     for device in device_list:
-        for vid_pid in set(DEVICES.values()):
-            if device.vid == vid_pid[0] and device.pid == vid_pid[1]:
+        for vid, pid in UART_DEV:
+            if pid is None and vid == device.vid:
                 possible_device.append(device)
-                break
+            elif vid == device.vid and pid == device.pid:
+                possible_device.append(device)
+    # According to pid, vid search fails, search by serial port number
     if not possible_device:
-        raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
+        possible_device = all_devices
+
     index = 0
     if len(possible_device) > 1:
         for i, device in enumerate(possible_device, 0):
-            info = ' {0:d}) {d.manufacturer:s} {d.description:s} (0x{d.vid:04X}, 0x{d.pid:04X})'.format(i, d = device)
+            # desc = '{d.manufacturer:s} {d.description:s}'.format(d = device).rsplit(' (', 1)[0]
+            desc = '{} {}'.format(device.manufacturer or '', device.description or '').rsplit(' (', 1)[0]
+            try:
+                info = ' {0:d}) {1} ({d.device:s}) (0x{d.vid:04X}, 0x{d.pid:04X})'.format(i, desc, d = device)
+            except TypeError:
+                info = ' {0:d}) {1} ({d.device:s})'.format(i, desc, d = device)
             print(info)
         choose = input('\n Select: ')
         index = int(choose, 10)
     selected_device = possible_device[index]
-    desc = '{d.manufacturer:s} {d.description:s}'.format(
-        d = selected_device).rsplit(' (', 1)[0]
+    desc = '{d.manufacturer:s} {d.description:s}'.format(d = selected_device).rsplit(' (', 1)[0]
     port = selected_device.device  # port or (vid, pid)
     return desc, port
 
