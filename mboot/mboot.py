@@ -248,7 +248,7 @@ class McuBoot(object):
         """ MCUBoot: Connect by USB
         :param vid_pid: Device vid and pid, support str or tuple, such as 'vid pid', (vid, pid)
         :param path: You need to specify additional paths when you insert two devices with the same vid, PID at the same time,
-        on linux: 'Bus 000 Address 005', on windows: the value of bus relations, such as '6&28e6394a&0&0000',
+        on linux: str '0,5' or tuple '(0,5)' represent 'Bus 000 Address 005', on windows: the value of bus relations, such as '6&28e6394a&0&0000',
         This function is not involved in library function calls, it is used in cli mode
         :return The result of opening the device
         """

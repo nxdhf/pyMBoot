@@ -166,7 +166,7 @@ if os.name == "nt":
                         new_target.desc = dev.vendor_name[:-1]
                         new_target.vid = dev.vendor_id
                         new_target.pid = dev.product_id
-                        new_target.path = dev.device_path.split('#')[-2]
+                        new_target.path = dev.device_path.split('#')[-2]    # Actually the device id, which is basically equivalent to dev.instance_id
                         new_target.device = dev
                         new_target.device.set_raw_data_handler(new_target.__rx_handler)
                         targets.append(new_target)
@@ -248,13 +248,21 @@ else:
             # logging.debug('USB-IN [0x]: %s', atos(rawdata))
             return self._decode_packet(rawdata)
 
+        def info(self):
+            if isinstance(self.path, collections.Sequence):
+                path = 'Bus {p[0]:03d} Address {p[1]:03d}'.format(p=self.path)
+            else:
+                path = self.path
+            return "{0:s} (0x{1:04X}, 0x{2:04X}) @ {3}".format(self.desc, self.vid, self.pid, path)
+
         @staticmethod
         def enumerate(vid, pid=None, path=None):
             """
             returns all the connected devices which matches PyUSB.vid/PyUSB.pid.
             returns an array of PyUSB (Interface) objects
-            :param vid:
-            :param pid:
+            :param vid: Device vid
+            :param pid: Device pid
+            :param path: a string or sequence to represent device path, like "BUS,ADDRESS" or (0,5).(BUS 000 ADDRESS 005)
             """
             # find all devices matching the vid/pid specified
             if pid is None:
@@ -272,7 +280,13 @@ else:
             for dev in all_devices:
                 # Specify additional path to search.
                 if path is not None:
-                    _, bus, _, address = path.split(' ')
+                    if isinstance(path, str):
+                        bus, address = (int(v) for v in path.split(','))
+                    else:
+                        try:
+                            bus, address = path
+                        except ValueError as e:
+                            raise ValueError('device id has' + e)
                     if not (int(bus) == dev.bus and int(address) == dev.address):
                         continue
 
@@ -331,7 +345,7 @@ else:
                 new_target.vendor_name = vendor_name
                 new_target.product_name = product_name
                 new_target.desc = product_name
-                new_target.path = 'Bus {:03d} Address {:03d}'.format(dev.bus, dev.address)
+                new_target.path = (dev.bus, dev.address)
                 targets.append(new_target)
 
             return targets

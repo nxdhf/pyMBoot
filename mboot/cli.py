@@ -432,6 +432,9 @@ def main():
         'such as "-s VIDPID SPEED", "-s VIDPID", "-s SPEED", "-s"', metavar=('vid,pid', 'speed'))
     group.add_argument('-i', '--i2c', nargs='*', help='Use i2c peripheral, '
         'such as "-i VIDPID SPEED", "-i VIDPID", "-i SPEED", "-i"', metavar=('vid,pid', 'speed'))
+    parser.add_argument('--select_device', help='When inserting two usbs with the same vid, pid, '
+        'manually select the device, so that the device selection prompt will not pop up. '
+        'In windows, its value is the device id, and under linux is a pair of numbers like "BUS,ADDRESS".')
 
     parser.add_argument('-t', '--timeout', type=int, help='Maximum wait time(Unit: s) for the change of the transceiver status in a single atomic operation, '
         'it is only valid for the "flash-erase-*" command and only changes the timeout of the ack after sending the packet, '
@@ -524,8 +527,8 @@ def main():
             raise McuBootGenericError('invalid command:{}'.format(cmd.origin[0]))
 
     if cmd.usb is not None:
-        vid_pid = parse_peripheral(Interface.USB.name, cmd.usb)[0]
-        mb.open_usb(vid_pid)
+        vid_pid = parse_peripheral(Interface.USB.name, cmd.usb, not cmd.select_device)[0]
+        mb.open_usb(vid_pid, cmd.select_device)
         # device = RawHID.enumerate(*vid_pid)[0]
         # mb.open_usb(device)
     elif cmd.uart is not None:

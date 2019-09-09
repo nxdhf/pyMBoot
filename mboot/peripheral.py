@@ -71,7 +71,7 @@ def parse_port(peripheral, arg):
         raise('Parse port fail. (port = {})'.format(arg))
     return port
 
-def parse_peripheral(peripheral, args):
+def parse_peripheral(peripheral, args, prompt=True):
     port = None
     product_name = peripheral
     speed = peripheral_speed[peripheral.lower()]
@@ -96,7 +96,7 @@ def parse_peripheral(peripheral, args):
     if port == None:
         scan_func = globals().get('scan_'+peripheral.lower(), None)
         if scan_func:
-            product_name, port = scan_func()
+            product_name, port = scan_func(prompt)
 
     if isinstance(port, str):
         info = ' DEVICE: {0:s} ({1:s}) {2:d}'.format(product_name, port, speed)
@@ -105,7 +105,7 @@ def parse_peripheral(peripheral, args):
     print(info)
     return port, speed
 
-def scan_usb():
+def scan_usb(prompt=True):
     devices = []
     for value in USB_DEV:
         # print(name, value[0], value[1])
@@ -113,19 +113,22 @@ def scan_usb():
     if not devices:
         raise McuBootConnectionError("\n - Target not detected !")
     index = 0
-    if len(devices) > 1:
+    if prompt and len(devices) > 1:
         for i, device in enumerate(devices, 0):
             print(' {0:d}) {1:s}'.format(i, device.info()))
         c = input('\n Select: ')
         index = int(c, 10)
     desc = devices[index].desc
-    vid_pid = (devices[index].vid, devices[index].pid, devices[index].path)
+    if prompt:
+        vid_pid = (devices[index].vid, devices[index].pid, devices[index].path)
+    else:   # Manually specify which device to select when repeating vid, pid, no need to pass in again
+        vid_pid = (devices[index].vid, devices[index].pid)
     # for device in devices:
     #     device.close()
     # print(' DEVICE: {0:s} (0x{p[0]:04X}, 0x{p[1]:04X}) {1:d} @ {2}'.format(desc, speed, device.path, p=port))
     return desc, vid_pid
 
-def scan_uart():
+def scan_uart(prompt=True):
     all_devices = serial.tools.list_ports.comports()
     if not all_devices:
         raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
@@ -143,7 +146,7 @@ def scan_uart():
         possible_device = all_devices
 
     index = 0
-    if len(possible_device) > 1:
+    if prompt and len(possible_device) > 1:
         for i, device in enumerate(possible_device, 0):
             # desc = '{d.manufacturer:s} {d.description:s}'.format(d = device).rsplit(' (', 1)[0]
             desc = '{} {}'.format(device.manufacturer or '', device.description or '').rsplit(' (', 1)[0]
@@ -159,13 +162,13 @@ def scan_uart():
     port = selected_device.device  # port or (vid, pid)
     return desc, port
 
-def scan_spi():
+def scan_spi(prompt=True):
     value = set(FTDI.values())
     devices = pyftdi.usbtools.UsbTools.find_all(value)
     if not devices: # not use, UsbTools will throw an error
         raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
     index = 0
-    if len(devices) > 1:
+    if prompt and len(devices) > 1:
         for i, device in enumerate(devices, 0):
             info = ' {0:d}) {d[-1]:s} ({d[1]:#04X}, {d[2]:#04X})'.format(i, d = device)
             print(info)
