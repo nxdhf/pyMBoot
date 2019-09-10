@@ -41,9 +41,9 @@ windows下通常会全局安装，如果没有，请在`PATH`中添加用户目�
 
 您可以尝试手动指定`vid`, `pid`或相应的`serial number`。请注意，如果是`uart`设备，它的自动搜索是基于`vid`, `pid`的，因此如果您的设备的`vid`, `pid`不在列表中，就找不到它，您可以提交一个`issues`，附上你设备的`vid`, `pid`。
 
-### 能否同时插入两个具有相同`vid, pid`的设备？
+### 能否同时插入多个具有相同`vid, pid`的设备？
 
-对于`uart`来说，这是可以的，因为自动搜索后会记录下用户选择设备的串口号，这是不会重复的，但对于其它外设来说，这是不行的，虽然仍然会弹出外设选择，但因为记录的是`vid, pid`，所以最终打开的设备会是第一个被发现的设备。
+对于`uart`来说不存在这个问题，因为自动搜索后会记录下用户选择设备的串口号，这是不会重复的，对于其它外设来说，`mboot`支持同时插入设备，它会弹出外设选择提示，你可以选择相应设备，你也可以手动指定设备的详细信息。详细可见[插入多个具有相同vid, pid的设备](insert_multiple_devices_with_the_same_vid_pid.zh-CN.md)。
 
 ### 在linux中读写串口有时会出错，但windows下正常？
 
@@ -52,9 +52,9 @@ windows下通常会全局安装，如果没有，请在`PATH`中添加用户目�
 * ERROR: read failed: device reports readiness to read but returned no data (device disconnected or multiple access on port?)
 * ERROR: Attempting to use a port that is not open
 
-具体表现为重复运行命令，有时正常有时出现错误。
+具体表现插入设备后一开始运行正常，但是约1~2秒后出现错误，等待系统挂载完毕储存，又恢复正常，怀疑是挂载设备时的问题。
 
-该问题目前在`ubuntu 18.04`上存在，似乎是`kernel`版本的问题，详见[1](https://bugs.launchpad.net/ubuntu/+source/linux-lts-trusty/+bug/1501345)[2](https://bugs.launchpad.net/ubuntu/+source/python2.7/+bug/1501240)
+该问题似乎是`kernel`版本的问题，详见[1](https://bugs.launchpad.net/ubuntu/+source/linux-lts-trusty/+bug/1501345)[2](https://bugs.launchpad.net/ubuntu/+source/python2.7/+bug/1501240)
 
 ### 为什么不使用`click`？
 
