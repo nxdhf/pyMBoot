@@ -15,14 +15,14 @@ class I2C(UartProtocolMixin):
         self.controller = None
         self.slave = None
 
-    def open(self, vid, pid, slave_address=0x10):
+    def open(self, vid, pid, index=1, slave_address=0x10):
         """ open the interface """
         self.controller = I2cController()
 
         # [URL Scheme — PyFtdi documentation](https://eblot.github.io/pyftdi/urlscheme.html#url-scheme)
         # # spi.configure('ftdi:///1')
         # url = 'ftdi://ftdi:{}/1'.format(target)
-        url = 'ftdi://{}:{}/1'.format(vid, pid)
+        url = 'ftdi://{}:{}/{:d}'.format(vid, pid, index)
         self.controller.configure(url, frequency=self.freq)
         # print('frequency', self.controller.frequency)
         self.slave = self.controller.get_port(slave_address)

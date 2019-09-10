@@ -303,7 +303,7 @@ class McuBoot(object):
         #     logging.info('UART Disconnected !')
         #     return False
     
-    def open_spi(self, vid_pid, freq=peripheral_speed['spi'], mode=0):
+    def open_spi(self, vid_pid, index=1, freq=peripheral_speed['spi'], mode=0):
         """ MCUBoot: Connect by UART
         """
         if isinstance(vid_pid, str):
@@ -313,7 +313,8 @@ class McuBoot(object):
             _vid_pid = vid_pid
         try:
             self._itf_ = SPI(freq, mode)
-            self._itf_.open(*_vid_pid)
+            index = index or 1
+            self._itf_.open(*_vid_pid, index=index)
         except Exception:
             logging.info('Open SPI failed, SPI disconnected !')
             if self.cli_mode:   # Fast failure in cli mode
@@ -324,7 +325,7 @@ class McuBoot(object):
             self.reopen_args = (_vid_pid, freq, mode)
             return True
 
-    def open_i2c(self, vid_pid, freq=peripheral_speed['i2c']):
+    def open_i2c(self, vid_pid, index=1, freq=peripheral_speed['i2c']):
         """ MCUBoot: Connect by UART
         """
         if isinstance(vid_pid, str):
@@ -333,7 +334,8 @@ class McuBoot(object):
             _vid_pid = vid_pid
         try:
             self._itf_ = I2C(freq)
-            self._itf_.open(*_vid_pid)
+            index = index or 1
+            self._itf_.open(*_vid_pid, index=index)
         except Exception:
             logging.info('Open I2C failed, I2C disconnected !')
             if self.cli_mode:   # Fast failure in cli mode

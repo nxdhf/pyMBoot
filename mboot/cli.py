@@ -432,9 +432,10 @@ def main():
         'such as "-s VIDPID SPEED", "-s VIDPID", "-s SPEED", "-s"', metavar=('vid,pid', 'speed'))
     group.add_argument('-i', '--i2c', nargs='*', help='Use i2c peripheral, '
         'such as "-i VIDPID SPEED", "-i VIDPID", "-i SPEED", "-i"', metavar=('vid,pid', 'speed'))
-    parser.add_argument('--select_device', help='When inserting two usbs with the same vid, pid, '
+    parser.add_argument('--select_device', help='When inserting two devices with the same vid, pid, '
         'manually select the device, so that the device selection prompt will not pop up. '
-        'In windows, its value is the device id, and under linux is a pair of numbers like "BUS,ADDRESS".')
+        'For "usb" devices, its value should be the device id under windows, and a pair of values ​​like "BUS, ADDRESS" under linux. '
+        'For "SPI", "I2C" devices, its value should be the value of the device path/locate in the order in which they are arranged by the port.')
 
     parser.add_argument('-t', '--timeout', type=int, help='Maximum wait time(Unit: s) for the change of the transceiver status in a single atomic operation, '
         'it is only valid for the "flash-erase-*" command and only changes the timeout of the ack after sending the packet, '
@@ -535,11 +536,11 @@ def main():
         port, baudrate = parse_peripheral(Interface.UART.name, cmd.uart)
         mb.open_uart(port, baudrate)
     elif cmd.spi is not None:
-        vid_pid, speed = parse_peripheral(Interface.SPI.name, cmd.spi)
-        mb.open_spi(vid_pid, speed, 0)
+        vid_pid, speed = parse_peripheral(Interface.SPI.name, cmd.spi, not cmd.select_device)
+        mb.open_spi(vid_pid, cmd.select_device, speed, 0)
     elif cmd.i2c is not None:
-        vid_pid, speed = parse_peripheral(Interface.I2C.name, cmd.i2c)
-        mb.open_i2c(vid_pid, speed)
+        vid_pid, speed = parse_peripheral(Interface.I2C.name, cmd.i2c, not cmd.select_device)
+        mb.open_i2c(vid_pid, cmd.select_device, speed)
     else:
         raise McuBootGenericError('You need to choose a peripheral for communication.')
 
