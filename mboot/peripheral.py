@@ -1,3 +1,4 @@
+import time
 import serial.tools.list_ports
 import pyftdi
 
@@ -129,18 +130,22 @@ def scan_usb(prompt=True):
     return desc, vid_pid
 
 def scan_uart(prompt=True):
-    all_devices = serial.tools.list_ports.comports()
-    if not all_devices:
-        raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
-    device_list = [device for device in all_devices if device.vid and device.pid]
-
-    possible_device = []
-    for device in device_list:
-        for vid, pid in UART_DEV:
-            if pid is None and vid == device.vid:
-                possible_device.append(device)
-            elif vid == device.vid and pid == device.pid:
-                possible_device.append(device)
+    for i in range(0, 9):
+        all_devices = serial.tools.list_ports.comports()
+        if not all_devices:
+            raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
+        device_list = [device for device in all_devices if device.vid and device.pid]
+        possible_device = []
+        for device in device_list:
+            for vid, pid in UART_DEV:
+                if pid is None and vid == device.vid:
+                    possible_device.append(device)
+                elif vid == device.vid and pid == device.pid:
+                    possible_device.append(device)
+        if not possible_device:
+            time.sleep(0.1) # Waiting for device initialization to complete
+        else:
+            break
     # According to pid, vid search fails, search by serial port number
     if not possible_device:
         possible_device = all_devices
