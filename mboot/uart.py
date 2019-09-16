@@ -156,7 +156,7 @@ class UART(UartProtocolMixin):
         while time.perf_counter() - start_time < timeout:
             start = self.ser.read(1)    # return bytes
             # logging.debug('{!r} {}'.format(start, type(start)))
-            if start[0] == 0x5A:
+            if start == b'\x5A':
                 return start
         raise McuBootTimeOutError
         
