@@ -58,6 +58,7 @@ def parse_port(peripheral, arg):
     if port.startswith('com') or port.startswith('/dev/'):
         if not peripheral.lower() == 'uart':
              raise('Uart port setting error. (port = {})'.format(arg))
+        port = arg  # Case sensitive under linux
     elif len(port.split(':')) == 2:
         str_list = port.split(':')
         port = (int(str_list[0],0), int(str_list[1], 0))
