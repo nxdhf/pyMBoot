@@ -75,6 +75,9 @@ class UART(UartProtocolMixin):
             self.ser.close()
         logging.debug("Close UART Interface")
 
+    def __str__(self):
+        return ' DEVICE: {0:s} ({1:s}) {2:d}'.format(product_name, port, speed)
+
     def get_supported_baudrates(self):
         if self.ser.isOpen():
             pass
