@@ -285,6 +285,23 @@ For the use of `MCU Boot Original Interface`, please refer to [MCU Bootloader Re
 
 [Here](doc/usage_example.md#MCU%20Boot%20Original%20Interface) are some examples.
 
+### Appendix: automatic device search range
 
+USB:
+
+| vid    | pid |
+| ------ | --- |
+| 0x15A2 | ALL |
+| 0x1FC9 | ALL |
+
+UART:
+
+| vid    | pid |
+| ------ | --- |
+| 0x0D28 | ALL |
+
+SPI&I2C:
+
+see [how to communicate spi i2c](doc/how_to_communicate_spi_i2c.md#Supported%20device) for details.
 
 [1]:https://github.com/molejar/pyMBoot

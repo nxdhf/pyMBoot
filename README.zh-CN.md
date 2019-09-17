@@ -283,6 +283,23 @@ optional arguments:
 
 [这里](doc/usage_example.md#MCU%20Boot%20User%20Interface)有一些具体实例。
 
+### 附录: 设备自动搜索范围
 
+USB:
+
+| vid    | pid |
+| ------ | --- |
+| 0x15A2 | ALL |
+| 0x1FC9 | ALL |
+
+UART:
+
+| vid    | pid |
+| ------ | --- |
+| 0x0D28 | ALL |
+
+SPI&I2C:
+
+详见[how_to_communicate_spi_i2c](doc/how_to_communicate_spi_i2c.zh-CN.md#Supported%20device)
 
 [1]:https://github.com/molejar/pyMBoot
