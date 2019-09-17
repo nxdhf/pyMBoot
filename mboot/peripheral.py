@@ -1,10 +1,9 @@
 import time
 import serial.tools.list_ports
-import pyftdi
 
 from .usb import RawHID
 from .exception import McuBootGenericError, McuBootConnectionError
-
+from .ftditool import UsbTools
 # DEVICES = {
 #     # NAME   | VID   | PID
 #     'MKL27': (0x15A2, 0x0073),
@@ -168,19 +167,33 @@ def scan_uart(prompt=True):
     port = selected_device.device  # port or (vid, pid)
     return desc, port
 
-def scan_spi(prompt=True):
-    value = set(FTDI.values())
-    devices = pyftdi.usbtools.UsbTools.find_all(value)
+def scan_spi(vid_pid):
+    if vid_pid is None:
+        value = set(FTDI.values())
+        # devices = pyftdi.usbtools.UsbTools.find_all(value)
+        devices = UsbTools.find_all(value)
+    else:
+        devices = UsbTools.find_all([vid_pid])
     if not devices: # not use, UsbTools will throw an error
         raise McuBootGenericError('\n - Automatic device search failed, please fill in the details')
-    index = 0
-    if prompt and len(devices) > 1:
-        for i, device in enumerate(devices, 0):
-            info = ' {0:d}) {d[-1]:s} ({d[1]:#04X}, {d[2]:#04X})'.format(i, d = device)
+    count = 1   # used for CLI prompt
+    if len(devices) == 1:
+        index_list = [1]
+    if len(devices) > 1:
+        count_dict = {}
+        index_list = []
+        for i, device in enumerate(devices, 1):
+            k = (device[0], device[1])
+            count_dict[k] = count_dict.get(k, 1)
+            index_list.append(count_dict[k])
+            count_dict[k] += 1
+            info = ' {0:d}) {d[4]:s} (0x{d[0]:04X}, 0x{d[1]:04X}) {d[2]}'.format(i, d = device)
             print(info)
         c = input('\n Select: ')
-        index = int(c, 10)
-    *vid_pid, _, _, desc = devices[index]
-    return desc, tuple(vid_pid)
+        count = int(c, 10)
+    *vid_pid, _, _, desc = devices[count-1]
+    index = index_list[count-1] # used for pyftdi URL parsing
+    config = tuple(vid_pid + [index])
+    return desc, config
 
 scan_i2c = scan_spi

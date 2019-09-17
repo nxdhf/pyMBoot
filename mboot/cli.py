@@ -434,8 +434,9 @@ def main():
         'such as "-i VIDPID SPEED", "-i VIDPID", "-i SPEED", "-i"', metavar=('vid,pid', 'speed'))
     parser.add_argument('--select_device', help='When inserting two devices with the same vid, pid, '
         'manually select the device, so that the device selection prompt will not pop up. '
-        'For "usb" devices, its value should be the device id under windows, and a pair of values ​​like "BUS, ADDRESS" under linux. '
-        'For "SPI", "I2C" devices, its value should be the value of the device path/locate in the order in which they are arranged by the port.')
+        'For "usb" devices, its value should be the device id under windows, and a pair of values ​​like "BUS, ADDRESS" under linux. ')
+    parser.add_argument('--ftdi_index', type=check_int, help='When inserting multiple SPI, I2C devices with the same vid, pid,'
+        'its value should be the value of the device path/locate in the order in which they are arranged by the port.')
 
     parser.add_argument('-t', '--timeout', type=int, help='Maximum wait time(Unit: s) for the change of the transceiver status in a single atomic operation, '
         'it is only valid for the "flash-erase-*" command and only changes the timeout of the ack after sending the packet, '
@@ -540,11 +541,27 @@ def main():
         port, baudrate = parse_peripheral(Interface.UART.name, cmd.uart)
         mb.open_uart(port, baudrate)
     elif cmd.spi is not None:
-        vid_pid, speed = parse_peripheral(Interface.SPI.name, cmd.spi, not cmd.select_device)
-        mb.open_spi(vid_pid, cmd.select_device, speed, 0)
+        if cmd.ftdi_index:
+            vid_pid, speed = parse_peripheral(Interface.SPI.name, cmd.spi, False)
+            if not vid_pid:
+                raise McuBootGenericError('You must manually enter "vid, pid" when using the "--ftdi_index" option')
+            mb.open_spi(vid_pid, cmd.ftdi_index, speed, 0)
+        else:
+            config, speed = parse_peripheral(Interface.SPI.name, cmd.spi)
+            vid_pid = config[0:2]
+            index = config[-1]
+            mb.open_spi(vid_pid, index, freq=speed, mode=0)
     elif cmd.i2c is not None:
-        vid_pid, speed = parse_peripheral(Interface.I2C.name, cmd.i2c, not cmd.select_device)
-        mb.open_i2c(vid_pid, cmd.select_device, speed)
+        if cmd.ftdi_index:
+            vid_pid, speed = parse_peripheral(Interface.I2C.name, cmd.i2c, False)
+            if not vid_pid:
+                raise McuBootGenericError('You must manually enter "vid, pid" when using the "--ftdi_index" option')
+            mb.open_i2c(vid_pid, cmd.ftdi_index, speed)
+        else:
+            config, speed = parse_peripheral(Interface.I2C.name, cmd.i2c)
+            vid_pid = config[0:2]
+            index = config[-1]
+            mb.open_i2c(vid_pid, index, freq=speed)
     else:
         raise McuBootGenericError('You need to choose a peripheral for communication.')
 

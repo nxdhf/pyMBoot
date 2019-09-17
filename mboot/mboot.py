@@ -311,7 +311,7 @@ class McuBoot(object):
         """
         if isinstance(vid_pid, str):
             # _vid_pid = parse_port(Interface.SPI.name, vid_pid)
-            _vid_pid, _freq = parse_peripheral(peripheral, args)
+            _vid_pid, _freq = parse_port(Interface.SPI.name, vid_pid)
         else:   # Default input tuple in cli mode, no conversion required
             _vid_pid = vid_pid
         try:

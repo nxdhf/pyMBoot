@@ -2,12 +2,11 @@ import time
 import struct
 import logging
 
-from pyftdi.i2c import I2cController
-
 from .tool import atos
 from .protocol import FPType, UartProtocolMixin
 from .exception import McuBootDataError, McuBootTimeOutError
 from .enums import StatusCode
+from .ftditool import I2cController
 
 class I2C(UartProtocolMixin):
     def __init__(self, freq):
@@ -22,7 +21,7 @@ class I2C(UartProtocolMixin):
         # [URL Scheme — PyFtdi documentation](https://eblot.github.io/pyftdi/urlscheme.html#url-scheme)
         # # spi.configure('ftdi:///1')
         # url = 'ftdi://ftdi:{}/1'.format(target)
-        url = 'ftdi://{}:{}/{:d}'.format(vid, pid, index)
+        url = 'ftdi://{}:{}:{}/1'.format(vid, pid, index)
         self.controller.configure(url, frequency=self.freq)
         # print('frequency', self.controller.frequency)
         self.slave = self.controller.get_port(slave_address)
