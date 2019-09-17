@@ -73,7 +73,7 @@ def parse_port(peripheral, arg):
         raise('Parse port fail. (port = {})'.format(arg))
     return port
 
-def parse_peripheral(peripheral, args, prompt=True):
+def parse_peripheral(peripheral, args, auto_scan=True):
     port = None
     product_name = peripheral
     speed = peripheral_speed[peripheral.lower()]
@@ -90,45 +90,45 @@ def parse_peripheral(peripheral, args, prompt=True):
         if args[0].isdigit():
             speed = int(args[0], 0)
         else:
-            port = args[0]
-            port = parse_port(peripheral, port)
+            port = parse_port(peripheral, args[0])
     elif args_len > 2:
         raise('peripheral length error. (peripheral = {})'.format(args))
-    
-    if port == None:
+
+    if auto_scan:
         scan_func = globals().get('scan_'+peripheral.lower(), None)
         if scan_func:
-            product_name, port = scan_func(prompt)
+            product_name, config = scan_func(port)
+        return config, speed
 
-    if isinstance(port, str):
-        info = ' DEVICE: {0:s} ({1:s}) {2:d}'.format(product_name, port, speed)
-    else:   # tuple or list
-        info = ' DEVICE: {0:s} (0x{p[0]:04X}, 0x{p[1]:04X}) {1:d}'.format(product_name, speed, p=port)
-    print(info)
     return port, speed
 
-def scan_usb(prompt=True):
+def scan_usb(vid_pid=None):
     devices = []
-    for value in USB_DEV:
-        # print(name, value[0], value[1])
-        devices += RawHID.enumerate(value[0], value[1])
+    if vid_pid is None:
+        for value in USB_DEV:
+            # print(name, value[0], value[1])
+            devices += RawHID.enumerate(value[0], value[1])
+    else:
+        devices += RawHID.enumerate(vid_pid[0], vid_pid[1])
     if not devices:
         raise McuBootConnectionError("\n - Target not detected !")
-    index = 0
-    if prompt and len(devices) > 1:
-        for i, device in enumerate(devices, 0):
+    count = 1
+    if len(devices) > 1:
+        for i, device in enumerate(devices, 1):
             print(' {0:d}) {1:s}'.format(i, device.info()))
         c = input('\n Select: ')
-        index = int(c, 10)
-    desc = devices[index].desc
-    if prompt:
-        vid_pid = (devices[index].vid, devices[index].pid, devices[index].path)
-    else:   # Manually specify which device to select when repeating vid, pid, no need to pass in again
-        vid_pid = (devices[index].vid, devices[index].pid)
+        count = int(c, 10)
+    select_device = devices[count-1]
+    desc = select_device.desc
+    # if prompt:
+    #     vid_pid = (devices[count].vid, devices[count].pid, devices[count].path)
+    # else:   # Manually specify which device to select when repeating vid, pid, no need to pass in again
+    #     vid_pid = (devices[count].vid, devices[count].pid)
+    config = (select_device.vid, select_device.pid, select_device.path)
     # for device in devices:
     #     device.close()
-    # print(' DEVICE: {0:s} (0x{p[0]:04X}, 0x{p[1]:04X}) {1:d} @ {2}'.format(desc, speed, device.path, p=port))
-    return desc, vid_pid
+    print(' DEVICE: {0:s} (0x{c[0]:04X}, 0x{c[1]:04X}) @ {c[2]}'.format(desc, c=config))
+    return desc, config
 
 def scan_uart(prompt=True):
     for i in range(0, 9):

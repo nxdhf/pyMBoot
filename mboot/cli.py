@@ -528,8 +528,12 @@ def main():
             raise McuBootGenericError('invalid command:{}'.format(cmd.origin[0]))
 
     if cmd.usb is not None:
-        vid_pid = parse_peripheral(Interface.USB.name, cmd.usb, not cmd.select_device)[0]
-        mb.open_usb(vid_pid, cmd.select_device)
+        if cmd.select_device:
+            vid_pid = parse_peripheral(Interface.USB.name, cmd.usb, not cmd.select_device)[0]
+            mb.open_usb(vid_pid, cmd.select_device)
+        else:
+            config = parse_peripheral(Interface.USB.name, cmd.usb)[0]
+            mb.open_usb(config[0:2], config[-1])
         # device = RawHID.enumerate(*vid_pid)[0]
         # mb.open_usb(device)
     elif cmd.uart is not None:

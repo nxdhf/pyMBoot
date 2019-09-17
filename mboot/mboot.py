@@ -244,7 +244,7 @@ class McuBoot(object):
         else:
             return False
 
-    def open_usb(self, vid_pid, path=None):
+    def open_usb(self, vid_pid=None, path=None):
         """ MCUBoot: Connect by USB
         :param vid_pid: Device vid and pid, support str or tuple, such as 'vid pid', (vid, pid)
         :param path: You need to specify additional paths when you insert two devices with the same vid, PID at the same time,
@@ -252,16 +252,19 @@ class McuBoot(object):
         This function is not involved in library function calls, it is used in cli mode
         :return The result of opening the device
         """
-        if isinstance(vid_pid, str):
-            _vid_pid = parse_port(Interface.USB.name, vid_pid)
-        else:   # Default input tuple in cli mode, no conversion required
-            if len(vid_pid) == 2:
-                _vid_pid = vid_pid
-            elif len(vid_pid) == 3 and path is None:
-                path = vid_pid[-1]
-                _vid_pid = vid_pid[:2]
-            else:
-                raise ValueError('vid_pid input error!')
+        if vid_pid and path is None:
+            if isinstance(vid_pid, str):
+                _vid_pid = parse_port(Interface.USB.name, vid_pid)
+            else:   # Default input tuple in cli mode, no conversion required
+                if len(vid_pid) == 2:
+                    _vid_pid = vid_pid
+                elif len(vid_pid) == 3 and path is None:
+                    path = vid_pid[-1]
+                    _vid_pid = vid_pid[:2]
+                else:
+                    raise ValueError('vid_pid input error!')
+        else:
+            _vid_pid = (None, None)
 
         dev = RawHID.enumerate(*_vid_pid, path)
         if len(dev) == 1:
@@ -274,7 +277,7 @@ class McuBoot(object):
         elif len(dev) > 1:
             raise McuBootGenericError("You need to specify additional paths when you insert two devices with the same vid, PID at the same time")
         else:
-            info = 'Can not find vid,pid: 0x{p[0]:04X}, 0x{p[1]:04X}'.format(p=_vid_pid)
+            info = 'Can not find device, please check vid, pid, path.'
             if self.cli_mode:   # Fast failure in cli mode
                 raise McuBootGenericError(info)
             logging.info(info)

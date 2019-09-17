@@ -132,7 +132,7 @@ if os.name == "nt":
             # return bytes(rawdata)
 
         @staticmethod
-        def enumerate(vid, pid=None, path=None):
+        def enumerate(vid=None, pid=None, path=None):
             """
             returns all the connected devices which matches PyWinUSB.vid/PyWinUSB.pid.
             returns an array of PyWinUSB (Interface) objects
@@ -144,10 +144,18 @@ if os.name == "nt":
             # find devices with good vid/pid
             all_kboot_devices = []
             for d in all_devices:
-                if pid is None and d.vendor_id == vid:
+                if d.vendor_id == vid and d.product_id == pid:
                     all_kboot_devices.append(d)
-                elif d.vendor_id == vid and d.product_id == pid:
+                elif path:  # serach by path, no need for vid, pid
                     all_kboot_devices.append(d)
+                elif pid is None and d.vendor_id == vid:
+                    all_kboot_devices.append(d)
+                elif vid is None and d.product_id == pid:
+                    all_kboot_devices.append(d)
+            if not all_kboot_devices:
+                logging.debug('No device connected(vid={}, pid={}), please check'
+                    '"vid", "pid", "device_path"'.format(vid or 'None', pid or 'None'))
+                return all_kboot_devices
 
             targets = []
             for dev in all_kboot_devices:
@@ -256,7 +264,7 @@ else:
             return "{0:s} (0x{1:04X}, 0x{2:04X}) @ {3}".format(self.desc, self.vid, self.pid, path)
 
         @staticmethod
-        def enumerate(vid, pid=None, path=None):
+        def enumerate(vid=None, pid=None, path=None):
             """
             returns all the connected devices which matches PyUSB.vid/PyUSB.pid.
             returns an array of PyUSB (Interface) objects
@@ -265,14 +273,20 @@ else:
             :param path: a string or sequence to represent device path, like "BUS,ADDRESS" or (0,5).(BUS 000 ADDRESS 005)
             """
             # find all devices matching the vid/pid specified
-            if pid is None:
-                all_devices = usb.core.find(find_all=True, idVendor=vid)
-            else:
+
+            if vid and pid:
                 all_devices = usb.core.find(find_all=True, idVendor=vid, idProduct=pid)
+            elif path:  # serach by path, no need for vid, pid
+                all_devices = usb.core.find(find_all=True)
+            elif pid is None and vid:
+                all_devices = usb.core.find(find_all=True, idVendor=vid)
+            elif vid is None and pid:
+                all_devices = usb.core.find(find_all=True, idProduct=pid)
 
             if not all_devices:
-                logging.debug("No device connected")
-                return None
+                logging.debug('No device connected(vid={}, pid={}), please check'
+                    '"vid", "pid", "device_path"'.format(vid or 'None', pid or 'None'))
+                return []
 
             targets = []
 
