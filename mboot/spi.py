@@ -16,14 +16,14 @@ class SPI(UartProtocolMixin):
         self.controller = None
         self.slave = None
 
-    def open(self, vid, pid, index=1):
+    def open(self, vid=None, pid=None, index=1):
         """ open the interface """
         self.controller = SpiController(cs_count=4)
         
         # [URL Scheme — PyFtdi documentation](https://eblot.github.io/pyftdi/urlscheme.html#url-scheme)
         # # spi.configure('ftdi:///1')
         # url = 'ftdi://ftdi:{}/1'.format(target)
-        url = 'ftdi://{}:{}:{}/1'.format(vid, pid, index)
+        url = 'ftdi://{}:{}:{}/1'.format(vid or '', pid or '', index)
         self.controller.configure(url)
         self.slave = self.controller.get_port(cs=0, freq=self.freq, mode=self.mode)
         logging.debug("Opening SPI interface")

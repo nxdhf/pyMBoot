@@ -309,7 +309,12 @@ class McuBoot(object):
     def open_spi(self, vid_pid, index=1, freq=peripheral_speed['spi'], mode=0):
         """ MCUBoot: Connect by UART
         """
-        if isinstance(vid_pid, str):
+        if vid_pid is None:
+            if index:
+                _vid_pid = (None, None)
+            else:
+                raise ValueError('"vid_pid" and "index", one must have a valid value.')
+        elif isinstance(vid_pid, str):
             # _vid_pid = parse_port(Interface.SPI.name, vid_pid)
             _vid_pid, _freq = parse_port(Interface.SPI.name, vid_pid)
         else:   # Default input tuple in cli mode, no conversion required
@@ -331,7 +336,12 @@ class McuBoot(object):
     def open_i2c(self, vid_pid, index=1, freq=peripheral_speed['i2c']):
         """ MCUBoot: Connect by UART
         """
-        if isinstance(vid_pid, str):
+        if vid_pid is None:
+            if index:
+                _vid_pid = (None, None)
+            else:
+                raise ValueError('"vid_pid" and "index", one must have a valid value.')
+        elif isinstance(vid_pid, str):
             _vid_pid = parse_port(Interface.I2C.name, vid_pid)
         else:   # Default input tuple in cli mode, no conversion required
             _vid_pid = vid_pid

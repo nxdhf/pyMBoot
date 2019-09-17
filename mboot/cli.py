@@ -543,8 +543,6 @@ def main():
     elif cmd.spi is not None:
         if cmd.ftdi_index:
             vid_pid, speed = parse_peripheral(Interface.SPI.name, cmd.spi, False)
-            if not vid_pid:
-                raise McuBootGenericError('You must manually enter "vid, pid" when using the "--ftdi_index" option')
             mb.open_spi(vid_pid, cmd.ftdi_index, speed, 0)
         else:
             config, speed = parse_peripheral(Interface.SPI.name, cmd.spi)
@@ -554,8 +552,6 @@ def main():
     elif cmd.i2c is not None:
         if cmd.ftdi_index:
             vid_pid, speed = parse_peripheral(Interface.I2C.name, cmd.i2c, False)
-            if not vid_pid:
-                raise McuBootGenericError('You must manually enter "vid, pid" when using the "--ftdi_index" option')
             mb.open_i2c(vid_pid, cmd.ftdi_index, speed)
         else:
             config, speed = parse_peripheral(Interface.I2C.name, cmd.i2c)
